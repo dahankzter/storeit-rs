@@ -1,0 +1,21 @@
+name: Conventional Commit (advisory)
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-title:
+    name: Check PR title
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Validate PR title follows Conventional Commits
+        uses: actions-ecosystem/action-regex-match@v2
+        with:
+          text: ${{ github.event.pull_request.title }}
+          regex: '^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\([\w\-\.]+\))?!?: .+'
+      - name: Report
+        run: |
+          echo "PR title: '${{ github.event.pull_request.title }}'"
+          echo "Note: This check is advisory and does not block merges."

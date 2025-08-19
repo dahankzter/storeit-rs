@@ -1,0 +1,5 @@
+error: Unknown attribute
+ --> tests/ui/fail/repository_unknown_nv.rs:7:29
+  |
+7 | #[repository(entity = User, bekkend = Libsql)]
+  |                             ^^^^^^^

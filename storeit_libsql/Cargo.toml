@@ -1,0 +1,51 @@
+[package]
+name = "storeit_libsql"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dahankzter/storeit-rs/"
+description = "LibSQL/Turso backend adapter for the storeit repository framework"
+
+[dependencies]
+async-trait = "0.1"
+storeit_core = { package = "storeit_core", path = "../storeit_core", version = "0.1" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+storeit_sql_builder = { package = "storeit_sql_builder", path = "../storeit_sql_builder", version = "0.1", features = ["libsql"] }
+# libsql is optional; only pulled when the backend feature is enabled
+libsql = { version = "0.9.20", optional = true }
+# Use tokio runtime internally to keep sync Repository API
+tokio = { version = "1", features = ["rt-multi-thread", "macros"], optional = true }
+tracing = { version = ">=0.1, <0.2", optional = true }
+metrics = { version = "0.21", optional = true }
+
+[dev-dependencies]
+# for file-based ephemeral DB path and shared test helpers
+tempfile = "3"
+tests_common = { path = "../tests_common" }
+storeit_macros = { package = "storeit_macros", path = "../storeit_macros", version = "0.1" }
+criterion = "0.5"
+
+[features]
+# Enable the actual backend implementation (pulls libsql + tokio)
+libsql-backend = ["dep:libsql", "dep:tokio"]
+# Feature aliases matching optional dependency names to restore implicit features
+# when using `--all-features` or external tooling. Using `dep:` disables Cargo's
+# implicit features for optional dependencies; these aliases make them explicit.
+libsql = ["dep:libsql"]
+tokio = ["dep:tokio"]
+# Opt-in: use INSERT ... RETURNING <id> for libsql when enabled (also enables the builder feature)
+libsql_returning = ["storeit_sql_builder/libsql_returning"]
+# Opt-in observability features
+tracing = ["dep:tracing"]
+metrics = ["dep:metrics"]
+# Pre-1.0 experimental APIs live behind this no-op feature across the workspace.
+unstable = []
+
+default = []
+
+[[bench]]
+name = "ops"
+harness = false

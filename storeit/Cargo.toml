@@ -1,0 +1,76 @@
+[package]
+name = "storeit"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dahankzter/storeit-rs/"
+description = "Ergonomic repository facade over storeit_core with optional SQL builder and backend adapters"
+
+[features]
+# Re-export the SQL builder for end users when enabled
+sql-builder = ["dep:storeit_sql_builder"]
+# Optional query ergonomics (naive paginate helper). Off by default.
+query-ext = []
+# Optional batch insert helper (naive loop by default).
+batch-ext = []
+# Optional streaming helper for find_by_field; wraps fetch into a Stream.
+stream-ext = ["dep:async-stream", "dep:futures-core"]
+# Optional upsert helper (naive fallback: insert then update).
+upsert-ext = []
+# Pre-1.0 experimental APIs live behind this no-op feature across the workspace.
+unstable = []
+# Backend selection features for end users; pull backend crates transitively so
+# users can depend only on `repository` and not on backend crates directly.
+libsql-backend = ["dep:storeit_libsql", "storeit_libsql/libsql-backend"]
+# Temporarily disable wiring to unpublished backends for initial publish; will be restored in a patch release.
+postgres-backend = []
+mysql-async = []
+
+# Explicit feature aliases matching optional dependency names.
+# This ensures tools invoking `--all-features` (or external crates enabling
+# features by the dependency name) work even though we use `dep:` syntax above,
+# which disables Cargo's implicit features for optional dependencies.
+storeit_libsql = ["libsql-backend"]
+storeit_tokio_postgres = ["postgres-backend"]
+storeit_mysql_async = ["mysql-async"]
+
+[dependencies]
+storeit_core = { package = "storeit_core", path = "../storeit_core", version = "0.1" }
+storeit_macros = { package = "storeit_macros", path = "../storeit_macros", version = "0.1" }
+storeit_sql_builder = { package = "storeit_sql_builder", path = "../storeit_sql_builder", version = "0.1", optional = true }
+async-trait = { version = "0.1", optional = false }
+async-stream = { version = "0.3", optional = true }
+futures-core = { version = "0.3", optional = true }
+# Optional backend crates; enabled via features above to avoid end-users adding them directly.
+storeit_libsql = { package = "storeit_libsql", path = "../storeit_libsql", version = "0.1", optional = true }
+# Note: storeit_tokio_postgres and storeit_mysql_async will be added back after they are published on crates.io.
+
+[dev-dependencies]
+mysql_async = "0.34"
+chrono = "0.4"
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+libsql = "0.9.20"
+tokio-postgres = "0.7"
+
+[[example]]
+name = "postgres_e2e"
+path = "examples/postgres_e2e.rs"
+# Temporarily disabled during initial publish: backend crate not yet wired.
+# Re-enable by setting this to ["postgres-backend"] after storeit_tokio_postgres is published
+# and re-added as an optional dependency.
+required-features = ["never-postgres-example"]
+
+[[example]]
+name = "mysql_e2e"
+path = "examples/mysql_e2e.rs"
+# Temporarily disabled during initial publish: backend crate not yet wired.
+# Re-enable by setting this to ["mysql-async"] after storeit_mysql_async is published
+# and re-added as an optional dependency.
+required-features = ["never-mysql-example"]
+
+[[example]]
+name = "libsql_e2e"
+path = "examples/libsql_e2e.rs"
+required-features = ["libsql-backend"]

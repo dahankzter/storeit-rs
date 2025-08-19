@@ -1,0 +1,10 @@
+# Cargo configuration for the workspace
+# Define cargo subcommand aliases used by the Makefile
+
+[alias]
+# Run coverage across the entire workspace with default features (match `cargo test` behavior)
+coverage = ["llvm-cov", "--workspace"]
+# Generate HTML coverage report (opens via Makefile)
+coverage-html = ["llvm-cov", "--workspace", "--html"]
+# Generate LCOV coverage output at lcov.info in repo root
+coverage-lcov = ["llvm-cov", "--workspace", "--lcov", "--output-path", "lcov.info"]

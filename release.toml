@@ -1,0 +1,40 @@
+# cargo-release configuration for the workspace
+# Docs: https://github.com/crate-ci/cargo-release
+
+# We keep per-crate versions; no shared-version bump by default
+shared-version = false
+
+# Only allow releases from the main branch
+allow-branch = ["main", "HEAD"]
+
+# Publishing behavior:
+# - We set `publish = true` so that the tag-based publish job (`cargo release --execute`)
+#   actually uploads the crates when a valid CARGO_REGISTRY_TOKEN is present.
+# - The CI verification (dry-run) path explicitly passes `--no-publish`, so it never
+#   attempts to publish when no token is available.
+# - This keeps us compatible with cargo-release versions that don’t support a
+#   `--publish` CLI flag and centralizes the decision in release.toml.
+# - Local dry-runs remain safe: `--dry-run` implies no publishing regardless of this flag.
+publish = true
+
+# Use Keep a Changelog file for release notes aggregation
+consolidate-commits = true
+
+# Tagging: tag each crate with `<crate>-v<version>`
+tag-name = "{{crate_name}}-v{{version}}"
+
+# Push back to the same remote
+push-remote = "origin"
+
+# Templates for commit/tag messages
+pre-release-commit-message = "chore(release): {{crate_name}} v{{version}}"
+# Note: We maintain a single workspace-level CHANGELOG at the repo root.
+# Per-crate replacements are disabled to avoid missing-file errors.
+# If needed in the future, CI can update the root changelog explicitly.
+
+# Don’t automatically set a next development version; keep versions as-is until the next release plan
+# If you prefer adding a -dev suffix, set dev-version = true and specify dev-version-ext
+
+# Workspaces can customize which crates are released. By default, cargo-release will respect each crate's
+# publish flag and will skip crates marked `publish = false` (e.g., tests_common).
+

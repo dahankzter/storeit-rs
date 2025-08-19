@@ -1,0 +1,42 @@
+[package]
+name = "storeit_tokio_postgres"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dahankzter/storeit-rs/"
+description = "PostgreSQL backend adapter (tokio-postgres) for the storeit repository framework"
+
+[dependencies]
+async-trait = "0.1"
+storeit_core = { package = "storeit_core", path = "../storeit_core", version = "0.1" }
+
+storeit_sql_builder = { package = "storeit_sql_builder", path = "../storeit_sql_builder", version = "0.1", features = [
+    "tokio_postgres",
+] }
+tokio-postgres = { version = "0.7", optional = true }
+# Use tokio for runtime; feature-gated to avoid forcing dependency by default
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "macros",
+], optional = true }
+tracing = { version = ">=0.1, <0.2", optional = true }
+metrics = { version = "0.21", optional = true }
+
+[dev-dependencies]
+# testcontainers harness for integration tests
+# Versions chosen to be broadly compatible in 2025
+testcontainers = "0.16"
+testcontainers-modules = { version = "0.4", features = ["postgres"] }
+tests_common = { path = "../tests_common" }
+
+[features]
+# Pull in tokio and tokio-postgres to enable the backend
+postgres-backend = ["dep:tokio-postgres", "dep:tokio"]
+# Opt-in observability features
+tracing = ["dep:tracing"]
+metrics = ["dep:metrics"]
+# Pre-1.0 experimental APIs live behind this no-op feature across the workspace.
+unstable = []
+
+default = []

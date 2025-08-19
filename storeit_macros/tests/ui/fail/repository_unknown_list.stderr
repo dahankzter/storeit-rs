@@ -1,0 +1,5 @@
+error: Unknown attribute list
+ --> tests/ui/fail/repository_unknown_list.rs:7:47
+  |
+7 | #[repository(entity = User, backend = Libsql, wronglist(find_by_email: String))]
+  |                                               ^^^^^^^^^

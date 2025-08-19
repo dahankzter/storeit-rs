@@ -1,0 +1,5 @@
+error: Unsupported finder type: u128. Use String, i32, i64, f64, or bool.
+ --> tests/ui/fail/repository_unsupported_finder_type.rs:7:1
+  |
+7 | #[repository(entity = User, backend = TokioPostgres, finders(find_by_count: u128))]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

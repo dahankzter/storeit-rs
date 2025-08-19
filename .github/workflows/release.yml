@@ -1,0 +1,165 @@
+name: Release (cargo-release)
+
+on:
+  # Create releases when pushing tags like `<crate>-v0.1.0` or `v0.1.0`
+  push:
+    tags:
+      - 'v*'
+      - '*-v*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref (tag or branch) to checkout for publishing; for Batch 2, use the original release tag (e.g., v0.1.0)"
+        required: false
+        type: string
+      packages:
+        description: "Comma-separated list of crates to publish (override default Batch 1). Example: storeit_mysql_async,storeit_tokio_postgres"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-and-release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # On workflow_dispatch, allow checking out the original release tag for Batch 2
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref != '' && github.event.inputs.ref || github.ref }}
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-release
+        run: cargo install cargo-release --locked
+
+      - name: Verify workspace (clippy + tests)
+        run: |
+          cargo clippy --workspace --all-features -- -Dwarnings
+          cargo test --workspace --all-features --no-fail-fast
+
+      - name: Dry-run release (no token)
+        if: ${{ env.CARGO_REGISTRY_TOKEN == '' }}
+        run: |
+          echo "No crates.io token found; running cargo-release dry-run for verification only."
+          cargo release minor --workspace --no-confirm --dry-run --no-publish
+
+      - name: "Publish crates with cargo-release (Batch 1 ≤5 new crates or custom packages)"
+        if: ${{ env.CARGO_REGISTRY_TOKEN != '' }}
+        env:
+            CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+            GIT_COMMITTER_NAME: github-actions[bot]
+            GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+            # crates.io limits to 5 NEW crates per 24h. On the first publish, we
+            # intentionally publish only a subset (Batch 1) to stay under the limit.
+            # Remaining crates can be published in a follow-up run the next day
+            # by adjusting the package list below (Batch 2), or by running a
+            # workflow_dispatch with an updated list.
+            #
+            # Usage for Batch 2 (next day):
+            # - Trigger this workflow via workflow_dispatch
+            # - Set `ref` to the original release tag (e.g., v0.1.0)
+            # - Set `packages` to a comma-separated list of the remaining crates, e.g.:
+            #     storeit_mysql_async,storeit_tokio_postgres
+            # - Ensure CARGO_REGISTRY_TOKEN is available in repo secrets
+            #
+            # Determine package list: use input `packages` if provided; otherwise default to Batch 1
+            # Determine candidate package list: use input `packages` if provided; otherwise default to Batch 1
+            CANDIDATES=()
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.packages }}" ]; then
+              IFS=',' read -ra PKGS <<< "${{ github.event.inputs.packages }}"
+              for p in "${PKGS[@]}"; do
+                p_trimmed=$(echo "$p" | xargs)
+                [ -n "$p_trimmed" ] && CANDIDATES+=("$p_trimmed")
+              done
+            else
+              CANDIDATES+=(
+                storeit_core
+                storeit_macros
+                storeit_sql_builder
+                storeit_libsql
+                storeit
+              )
+            fi
+
+            # Filter out crates that are already published at the current version on crates.io
+            # Note: cargo-release errors when trying to publish an already-published version.
+            FILTERED=()
+            for crate in "${CANDIDATES[@]}"; do
+              manifest_path="${crate}/Cargo.toml"
+              if [ ! -f "$manifest_path" ]; then
+                echo "Warning: manifest not found for $crate at $manifest_path; skipping"
+                continue
+              fi
+              # Extract version = "x.y.z" from the [package] section
+              ver=$(grep -m1 -E '^version\s*=\s*"' "$manifest_path" | sed -E 's/.*"([^"]+)".*/\1/')
+              if [ -z "$ver" ]; then
+                echo "Warning: could not determine version for $crate; keeping it in the list"
+                FILTERED+=("$crate")
+                continue
+              fi
+              http_code=$(curl -s -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/${crate}/${ver}") || http_code=000
+              if [ "$http_code" = "200" ]; then
+                echo "Info: $crate $ver already published on crates.io; skipping"
+              else
+                FILTERED+=("$crate")
+              fi
+            done
+
+            if [ ${#FILTERED[@]} -eq 0 ]; then
+              echo "Nothing to publish; all selected crates are already on crates.io"
+              exit 0
+            fi
+
+            # Note: We run on a tag checkout for push-tag events; for workflow_dispatch, we checkout `inputs.ref`.
+            # We avoid remote VCS mutations (--no-tag/--no-push). Commits (if any) won’t be pushed.
+            set -euo pipefail
+
+            # Run cargo-release per crate so we can gracefully handle already-published versions
+            # Write logs outside the repo to avoid creating untracked files that make the workspace dirty.
+            LOG_DIR="${RUNNER_TEMP:-/tmp}/cargo-release-logs"
+            mkdir -p "$LOG_DIR"
+            for crate in "${FILTERED[@]}"; do
+              echo "Publishing $crate..."
+              LOG_FILE="$LOG_DIR/publish_${crate}.log"
+              # Run and capture output; allow command to fail so we can inspect
+              set +e
+              cargo release --no-confirm --execute \
+                --allow-branch HEAD \
+                --no-verify \
+                --no-tag \
+                --no-push \
+                --package "$crate" 2>&1 | tee "$LOG_FILE"
+              status=${PIPESTATUS[0]}
+              set -e
+              if [ $status -ne 0 ]; then
+                if grep -q "is already published" "$LOG_FILE"; then
+                  echo "Info: $crate is already published; skipping."
+                  continue
+                else
+                  echo "Error: cargo-release failed for $crate. See $LOG_FILE"
+                  exit $status
+                fi
+              fi
+            done
+            echo "Finished publishing selected crates."
+      
+
+      - name: Create GitHub Release (draft)
+        if: ${{ github.event_name == 'push' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true

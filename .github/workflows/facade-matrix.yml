@@ -1,0 +1,52 @@
+name: Facade Feature Matrix
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  repository-feature-matrix:
+    name: repository crate features (${{ matrix.feature }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature: [none, libsql-backend, postgres-backend, mysql-async]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (no default features)
+        if: matrix.feature == 'none'
+        run: |
+          cargo build -p storeit --no-default-features
+          cargo clippy -p storeit --no-default-features -- -Dwarnings
+
+      - name: Build (feature = libsql-backend)
+        if: matrix.feature == 'libsql-backend'
+        run: |
+          cargo build -p storeit --no-default-features --features libsql-backend
+          cargo clippy -p storeit --no-default-features --features libsql-backend -- -Dwarnings
+
+      - name: Build (feature = postgres-backend)
+        if: matrix.feature == 'postgres-backend'
+        run: |
+          cargo build -p storeit --no-default-features --features postgres-backend
+          cargo clippy -p storeit --no-default-features --features postgres-backend -- -Dwarnings
+
+      - name: Build (feature = mysql-async)
+        if: matrix.feature == 'mysql-async'
+        run: |
+          cargo build -p storeit --no-default-features --features mysql-async
+          cargo clippy -p storeit --no-default-features --features mysql-async -- -Dwarnings

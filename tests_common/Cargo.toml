@@ -1,0 +1,15 @@
+[package]
+name = "tests_common"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+async-trait = "0.1"
+storeit_core = { package = "storeit_core", path = "../storeit_core" }
+repository = { package = "storeit", path = "../storeit" }
+
+[lib]
+name = "tests_common"
+path = "src/lib.rs"

@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+ --> tests/ui/fail/entity_invalid_meta.rs:3:10
+  |
+3 | #[derive(Entity)]
+  |          ^^^^^^
+  |
+  = help: message: Invalid #[fetch(column = "...")] syntax: Error("expected `=`")

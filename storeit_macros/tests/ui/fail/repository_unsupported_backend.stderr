@@ -1,0 +1,7 @@
+error: custom attribute panicked
+ --> tests/ui/fail/repository_unsupported_backend.rs:6:1
+  |
+6 | #[repository(entity = User, backend = UnknownDb)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: message: Unsupported backend: `UnknownDb`. Supported backends are: TokioPostgres, MysqlAsync, Libsql

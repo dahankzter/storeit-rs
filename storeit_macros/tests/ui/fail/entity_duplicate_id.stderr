@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+ --> tests/ui/fail/entity_duplicate_id.rs:3:10
+  |
+3 | #[derive(Entity)]
+  |          ^^^^^^
+  |
+  = help: message: Exactly one field must be marked with #[fetch(id)]

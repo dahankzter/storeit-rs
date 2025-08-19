@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+ --> tests/ui/fail/entity_missing_id.rs:3:10
+  |
+3 | #[derive(Entity)]
+  |          ^^^^^^
+  |
+  = help: message: A field must be marked with #[fetch(id)] to use the repository macro.

@@ -1,0 +1,32 @@
+[package]
+name = "storeit_sql_builder"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dahankzter/storeit-rs/"
+description = "SQL builder for storeit with pluggable placeholder styles and optional RETURNING support"
+
+[dependencies]
+storeit_core = { package = "storeit_core", path = "../storeit_core", version = "0.1" }
+
+[features]
+# Placeholder style flavors
+tokio_postgres = []
+mysql_async = []
+rusqlite = []
+libsql = []
+# Optional: use INSERT ... RETURNING for libsql backends when enabled
+libsql_returning = []
+# Pre-1.0 experimental APIs live behind this no-op feature across the workspace.
+unstable = []
+
+[dev-dependencies]
+storeit_macros = { package = "storeit_macros", path = "../storeit_macros", version = "0.1" }
+# Keep tests backend-agnostic: do not enable backend-specific macro features here,
+# and avoid pulling backend crates. This prevents generating unused RowAdapter impls
+# in tests that would otherwise appear as uncovered in coverage reports.
+chrono = "0.4"
+uuid = "1"
+rust_decimal = "1"
+proptest = "1"

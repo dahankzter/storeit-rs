@@ -1,0 +1,5 @@
+error: expected `:`
+ --> tests/ui/fail/repository_invalid_finders_syntax.rs:7:68
+  |
+7 | #[repository(entity = User, backend = Libsql, finders(find_by_email))]
+  |                                                                    ^

@@ -1,0 +1,5 @@
+error: Unsupported attribute format
+ --> tests/ui/fail/repository_unsupported_attr_format.rs:7:14
+  |
+7 | #[repository(entity)]
+  |              ^^^^^^

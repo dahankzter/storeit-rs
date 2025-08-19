@@ -1,0 +1,19 @@
+[workspace]
+members = [
+    "storeit_core",
+    "storeit_macros",
+    "storeit",
+    "storeit_sql_builder",
+    "storeit_mysql_async",
+    "storeit_tokio_postgres",
+    "storeit_libsql",
+    "tests_common",
+]
+resolver = "2"
+
+[alias]
+# Coverage aliases used by the Makefile and documented in README
+coverage = "llvm-cov --workspace --all-features"
+coverage-html = "llvm-cov --workspace --all-features --html"
+coverage-lcov = "llvm-cov --workspace --all-features --lcov --output-path lcov.info"
+

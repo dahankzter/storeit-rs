@@ -1,0 +1,37 @@
+[package]
+name = "storeit_macros"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+description = "Procedural macros for the storeit repository library"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dahankzter/storeit-rs/"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }
+chrono = "0.4"
+inflections = "1"
+
+
+[features]
+# These flags are used by the `Entity` derive macro to generate
+# backend-specific implementations. They are enabled transitively
+# by the backend adapter crates.
+postgres = []
+mysql = []
+libsql = []
+# Workspace-wide: gate experimental APIs prior to 1.0
+unstable = []
+
+[dev-dependencies]
+trybuild = "1"
+storeit_core = { package = "storeit_core", path = "../storeit_core" }
+storeit_libsql = { package = "storeit_libsql", path = "../storeit_libsql" }
+storeit_mysql_async = { package = "storeit_mysql_async", path = "../storeit_mysql_async" }
+storeit_tokio_postgres = { package = "storeit_tokio_postgres", path = "../storeit_tokio_postgres" }
+async-trait = "0.1"

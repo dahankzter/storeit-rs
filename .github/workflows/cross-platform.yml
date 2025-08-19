@@ -1,0 +1,40 @@
+name: Cross-platform (core + builder)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    name: ${{ matrix.os }} (Rust stable)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build core crates
+        run: |
+          cargo build -p storeit_core -p storeit_macros -p storeit_sql_builder
+
+      - name: Clippy (core crates)
+        run: |
+          cargo clippy -p storeit_core -p storeit_macros -p storeit_sql_builder -- -Dwarnings
+
+      - name: Test core crates
+        run: |
+                  cargo test -p storeit_core -p storeit_sql_builder --no-fail-fast

@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    name: Format (rustfmt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  clippy:
+    name: Clippy (deny warnings)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: [stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Run clippy (workspace, all targets, all features)
+        run: cargo clippy --workspace --all-targets --all-features
+
+  test:
+    name: Tests (stable + MSRV)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: [stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Run tests (workspace, all features)
+        run: cargo test --workspace --all-features
+
+  docs:
+    name: Docs build (-D warnings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build docs (deny warnings)
+        run: cargo doc --workspace --all-features --no-deps
+
+  feature-matrix:
+    name: Facade feature matrix (build storeit)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: no-backend
+            features: ""
+          - name: libsql-backend
+            features: libsql-backend
+          - name: postgres-backend
+            features: postgres-backend
+          - name: mysql-async
+            features: mysql-async
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: "Build storeit (features: ${{ matrix.features }})"
+        run: |
+          if [ -z "${{ matrix.features }}" ]; then
+            cargo build -p storeit
+          else
+            cargo build -p storeit --features "${{ matrix.features }}"
+          fi
+
+  link-check:
+    name: Link checker (README + docs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run lychee link checker
+        uses: lycheeverse/lychee-action@v1
+        with:
+          args: >-
+            --no-progress
+            --verbose
+            --max-concurrency 4
+            --accept 200..399
+            README.md docs/**/*.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  no-anyhow:
+    name: Ensure no direct anyhow in manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if any Cargo.toml declares anyhow (prod or dev deps)
+        run: |
+          set -e
+          if grep -R "^anyhow\s*=\s*\"" --include Cargo.toml --exclude-dir target .; then
+            echo "Found anyhow in Cargo.toml above (should be removed)"; exit 1; fi
+          echo "No anyhow in manifests."
