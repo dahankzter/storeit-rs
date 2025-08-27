@@ -6,6 +6,7 @@ rust-version = "1.70"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/dahankzter/storeit-rs/"
 description = "Ergonomic repository facade over storeit_core with optional SQL builder and backend adapters"
+readme = "README.md"
 
 [features]
 # Re-export the SQL builder for end users when enabled

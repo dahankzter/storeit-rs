@@ -6,6 +6,7 @@ rust-version = "1.70"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/dahankzter/storeit-rs/"
 description = "LibSQL/Turso backend adapter for the storeit repository framework"
+readme = "README.md"
 
 [dependencies]
 async-trait = "0.1"

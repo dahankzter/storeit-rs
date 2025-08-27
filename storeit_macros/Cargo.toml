@@ -6,6 +6,7 @@ rust-version = "1.70"
 description = "Procedural macros for the storeit repository library"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/dahankzter/storeit-rs/"
+readme = "README.md"
 
 [lib]
 proc-macro = true

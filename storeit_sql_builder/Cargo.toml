@@ -6,6 +6,7 @@ rust-version = "1.70"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/dahankzter/storeit-rs/"
 description = "SQL builder for storeit with pluggable placeholder styles and optional RETURNING support"
+readme = "README.md"
 
 [dependencies]
 storeit_core = { package = "storeit_core", path = "../storeit_core", version = "0.1" }
