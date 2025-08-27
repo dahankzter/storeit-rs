@@ -44,7 +44,7 @@ struct AppState {
 struct CreateUser { email: String, active: bool }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Shared in-memory database
     let db_url = "file::memory:?cache=shared".to_string();
     #[allow(deprecated)]

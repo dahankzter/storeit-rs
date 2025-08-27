@@ -107,8 +107,13 @@ fn to_http_err(e: storeit::RepoError) -> actix_web::Error {
     actix_web::error::ErrorInternalServerError(format!("{e:#}"))
 }
 
+mod anyhow {
+    pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+    pub type Result<T> = std::result::Result<T, Error>;
+}
+
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> anyhow::Result<()> {
     // Shared in-memory database
     let db_url = "file::memory:?cache=shared".to_string();
     #[allow(deprecated)]

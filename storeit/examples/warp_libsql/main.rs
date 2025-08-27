@@ -34,8 +34,13 @@ struct CreateUser {
     active: bool,
 }
 
+mod anyhow {
+    pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+    pub type Result<T> = std::result::Result<T, Error>;
+}
+
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     // Shared in-memory database
     let db_url = "file::memory:?cache=shared".to_string();
     #[allow(deprecated)]
