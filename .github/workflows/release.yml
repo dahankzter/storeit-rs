@@ -36,6 +36,11 @@ jobs:
           # On workflow_dispatch, allow checking out a specific ref/tag if provided.
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref != '' && github.event.inputs.ref || github.ref }}
 
+      - name: Configure git user for cargo-release
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@v1
         with:
