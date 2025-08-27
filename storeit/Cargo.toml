@@ -23,9 +23,8 @@ unstable = []
 # Backend selection features for end users; pull backend crates transitively so
 # users can depend only on `repository` and not on backend crates directly.
 libsql-backend = ["dep:storeit_libsql", "storeit_libsql/libsql-backend"]
-# Temporarily disable wiring to unpublished backends for initial publish; will be restored in a patch release.
-postgres-backend = []
-mysql-async = []
+postgres-backend = ["dep:storeit_tokio_postgres", "storeit_tokio_postgres/postgres-backend"]
+mysql-async = ["dep:storeit_mysql_async", "storeit_mysql_async/mysql-async"]
 
 # Explicit feature aliases matching optional dependency names.
 # This ensures tools invoking `--all-features` (or external crates enabling
@@ -44,7 +43,8 @@ async-stream = { version = "0.3", optional = true }
 futures-core = { version = "0.3", optional = true }
 # Optional backend crates; enabled via features above to avoid end-users adding them directly.
 storeit_libsql = { package = "storeit_libsql", path = "../storeit_libsql", version = "0.1", optional = true }
-# Note: storeit_tokio_postgres and storeit_mysql_async will be added back after they are published on crates.io.
+storeit_tokio_postgres = { package = "storeit_tokio_postgres", path = "../storeit_tokio_postgres", version = "0.1", optional = true }
+storeit_mysql_async = { package = "storeit_mysql_async", path = "../storeit_mysql_async", version = "0.1", optional = true }
 
 [dev-dependencies]
 mysql_async = "0.34"
@@ -57,17 +57,13 @@ tokio-postgres = "0.7"
 [[example]]
 name = "postgres_e2e"
 path = "examples/postgres_e2e.rs"
-# Temporarily disabled during initial publish: backend crate not yet wired.
-# Re-enable by setting this to ["postgres-backend"] after storeit_tokio_postgres is published
-# and re-added as an optional dependency.
+# Intentionally not auto-built in CI to avoid pulling DB containers; enable locally with --features postgres-backend
 required-features = ["never-postgres-example"]
 
 [[example]]
 name = "mysql_e2e"
 path = "examples/mysql_e2e.rs"
-# Temporarily disabled during initial publish: backend crate not yet wired.
-# Re-enable by setting this to ["mysql-async"] after storeit_mysql_async is published
-# and re-added as an optional dependency.
+# Intentionally not auto-built in CI to avoid pulling DB containers; enable locally with --features mysql-async
 required-features = ["never-mysql-example"]
 
 [[example]]

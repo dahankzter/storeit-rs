@@ -145,3 +145,76 @@ coverage-all-summary: tools
 	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_mysql_async --features mysql-async --no-report -- --ignored
 	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_tokio_postgres --features postgres-backend --no-report -- --ignored
 	$(CARGO) llvm-cov report --summary-only
+
+
+# --- Release helpers ---
+.PHONY: release release-crate release-dispatch
+
+# make release VERSION=0.1.1
+# Creates and pushes a tag v${VERSION}. The GitHub Actions workflow
+# (Release (cargo-release)) triggers on tag pushes and will publish crates.
+release:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Usage: make release VERSION=X.Y.Z"; \
+		exit 1; \
+	fi
+	@# Ensure working tree is clean
+	@if [ -n "$$("git" status --porcelain)" ]; then \
+		echo "Working tree not clean. Commit or stash changes before releasing."; \
+		exit 1; \
+	fi
+	@# Check that the tag does not already exist locally or remotely
+	@if git rev-parse "v$(VERSION)" >/dev/null 2>&1; then \
+		echo "Tag v$(VERSION) already exists locally."; \
+		exit 1; \
+	fi
+	@if git ls-remote --exit-code --tags origin "refs/tags/v$(VERSION)" >/dev/null 2>&1; then \
+		echo "Tag v$(VERSION) already exists on origin."; \
+		exit 1; \
+	fi
+	@git tag -s "v$(VERSION)" -m "Release v$(VERSION)"
+	@git push origin "v$(VERSION)"
+	@echo "Pushed signed tag v$(VERSION). The GitHub Release workflow will run automatically."
+
+# make release-crate CRATE=storeit_mysql_async VERSION=0.1.1
+# Creates and pushes a tag ${CRATE}-v${VERSION} (useful to release a subset of crates).
+release-crate:
+	@if [ -z "$(CRATE)" ] || [ -z "$(VERSION)" ]; then \
+		echo "Usage: make release-crate CRATE=<crate> VERSION=X.Y.Z"; \
+		exit 1; \
+	fi
+	@# Ensure working tree is clean
+	@if [ -n "$$("git" status --porcelain)" ]; then \
+		echo "Working tree not clean. Commit or stash changes before releasing."; \
+		exit 1; \
+	fi
+	@TAG="$(CRATE)-v$(VERSION)"; \
+	if git rev-parse "$$TAG" >/dev/null 2>&1; then \
+	  echo "Tag $$TAG already exists locally."; \
+	  exit 1; \
+	fi; \
+	if git ls-remote --exit-code --tags origin "refs/tags/$$TAG" >/dev/null 2>&1; then \
+	  echo "Tag $$TAG already exists on origin."; \
+	  exit 1; \
+	fi; \
+	git tag -s "$$TAG" -m "Release $$TAG"; \
+	git push origin "$$TAG"; \
+	echo "Pushed signed tag $$TAG. The GitHub Release workflow will run automatically."
+
+# make release-dispatch [REF=<branch-or-tag>] [PACKAGES="crate1,crate2"]
+# Triggers the Release workflow manually via GitHub CLI (optional alternative to tags).
+# Requires: GitHub CLI (gh) authenticated with repo scope.
+release-dispatch:
+	@if ! command -v gh >/dev/null 2>&1; then \
+		echo "GitHub CLI (gh) is not installed. See https://cli.github.com/"; \
+		exit 1; \
+	fi
+	@REF_ARG=""; [ -n "$(REF)" ] && REF_ARG="ref=$(REF)" || true; \
+	PKG_ARG=""; [ -n "$(PACKAGES)" ] && PKG_ARG="packages=$(PACKAGES)" || true; \
+	if [ -z "$$REF_ARG$$PKG_ARG" ]; then \
+	  echo "Dispatching workflow without inputs..."; \
+	  gh workflow run "Release (cargo-release)"; \
+	else \
+	  echo "Dispatching workflow with inputs: $$REF_ARG $$PKG_ARG"; \
+	  gh workflow run "Release (cargo-release)" --field $$REF_ARG --field $$PKG_ARG; \
+	fi

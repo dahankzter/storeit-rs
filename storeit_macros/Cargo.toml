@@ -30,8 +30,8 @@ unstable = []
 
 [dev-dependencies]
 trybuild = "1"
-storeit_core = { package = "storeit_core", path = "../storeit_core" }
-storeit_libsql = { package = "storeit_libsql", path = "../storeit_libsql" }
-storeit_mysql_async = { package = "storeit_mysql_async", path = "../storeit_mysql_async" }
-storeit_tokio_postgres = { package = "storeit_tokio_postgres", path = "../storeit_tokio_postgres" }
+storeit_core = { package = "storeit_core", path = "../storeit_core", version = "0.1" }
+storeit_libsql = { package = "storeit_libsql", path = "../storeit_libsql", version = "0.1" }
+storeit_mysql_async = { package = "storeit_mysql_async", path = "../storeit_mysql_async", version = "0.1" }
+storeit_tokio_postgres = { package = "storeit_tokio_postgres", path = "../storeit_tokio_postgres", version = "0.1" }
 async-trait = "0.1"
