@@ -737,6 +737,137 @@ mod tests {
         assert_eq!(found.len(), 1, "expected one row visible after commit");
     }
 
+    // Ensure read_only transactions prevent writes and return an error without poisoning state
+    #[tokio::test]
+    async fn read_only_tx_prevents_writes() {
+        let db = setup_db().await;
+        let mgr = LibsqlTransactionManager::from_arc(db.clone());
+        let def_ro = TransactionDefinition {
+            propagation: Propagation::Required,
+            isolation: Isolation::Default,
+            read_only: true,
+            timeout: None,
+        };
+        let db_in = db.clone();
+        let res = mgr
+            .execute(&def_ro, move |_ctx| {
+                let db_in = db_in.clone();
+                async move {
+                    // Try to perform a write inside read-only transaction
+                    #[allow(deprecated)]
+                    let repo: LibsqlRepository<U, A> = LibsqlRepository::new(db_in.clone(), A);
+                    let err = repo
+                        .insert(&U { id: None, email: "ro@x".into(), active: true })
+                        .await
+                        .expect_err("write should fail in read-only tx");
+                    let _ = err; // just ensure error surfaced
+                    Ok::<_, storeit_core::RepoError>(())
+                }
+            })
+            .await;
+        // Outer execute should still be Ok because inner handled the error
+        assert!(res.is_ok());
+
+        // Outside transactions we can write fine
+        let repo2: LibsqlRepository<U, A> = LibsqlRepository::new(db.clone(), A);
+        let created = repo2
+            .insert(&U { id: None, email: "rw@x".into(), active: true })
+            .await
+            .expect("insert outside tx");
+        assert!(repo2.find_by_id(&created.id.unwrap()).await.unwrap().is_some());
+    }
+
+    // Nested savepoint paths: one inner commit (RELEASE) and one inner rollback (ROLLBACK TO SAVEPOINT)
+    #[tokio::test]
+    async fn nested_savepoint_commit_and_rollback() {
+        let db = setup_db().await;
+        let mgr = LibsqlTransactionManager::from_arc(db.clone());
+        let outer = TransactionDefinition {
+            propagation: Propagation::Required,
+            isolation: Isolation::Default,
+            read_only: false,
+            timeout: None,
+        };
+        let email_ok = "inner_ok@x".to_string();
+        let email_fail = "inner_fail@x".to_string();
+        let email_ok_outer = email_ok.clone();
+        let email_fail_outer = email_fail.clone();
+
+        let db_outer = db.clone();
+        let mgr_outer = mgr.clone();
+        let res = mgr_outer
+            .execute(&outer, move |_ctx_outer| {
+                let mgr = mgr.clone();
+                let email_ok = email_ok.clone();
+                let email_fail = email_fail.clone();
+                let db_outer = db_outer.clone();
+                async move {
+                    // Inner successful nested tx
+                    let inner_ok = TransactionDefinition {
+                        propagation: Propagation::Nested,
+                        isolation: Isolation::Default,
+                        read_only: false,
+                        timeout: None,
+                    };
+                    let db1 = db_outer.clone();
+                    let _ = mgr
+                        .execute(&inner_ok, move |_ctx| {
+                            let db1 = db1.clone();
+                            async move {
+                                let repo: LibsqlRepository<U, A> = LibsqlRepository::new(db1.clone(), A);
+                                let _ = repo
+                                    .insert(&U { id: None, email: email_ok.clone(), active: true })
+                                    .await?;
+                                Ok::<_, storeit_core::RepoError>(())
+                            }
+                        })
+                        .await?;
+
+                    // Inner failing nested tx -> rollback savepoint
+                    let inner_fail = TransactionDefinition {
+                        propagation: Propagation::Nested,
+                        isolation: Isolation::Default,
+                        read_only: false,
+                        timeout: None,
+                    };
+                    let db2 = db_outer.clone();
+                    let _ = mgr
+                        .execute::<(), _, _>(&inner_fail, move |_ctx| {
+                            let db2 = db2.clone();
+                            async move {
+                                let repo: LibsqlRepository<U, A> = LibsqlRepository::new(db2.clone(), A);
+                                let _ = repo
+                                    .insert(&U { id: None, email: email_fail.clone(), active: false })
+                                    .await?;
+                                Err::<(), storeit_core::RepoError>(storeit_core::RepoError::backend(
+                                    std::io::Error::new(std::io::ErrorKind::Other, "boom"),
+                                ))
+                            }
+                        })
+                        .await
+                        .expect_err("inner should rollback");
+                    Ok::<_, storeit_core::RepoError>(())
+                }
+            })
+            .await;
+        assert!(res.is_ok(), "outer should commit");
+
+        // Verify only the committed inner row exists
+        let email_ok_q = email_ok_outer.clone();
+        let email_fail_q = email_fail_outer.clone();
+        let repo: LibsqlRepository<U, A> = LibsqlRepository::new(db, A);
+        let ok = repo
+            .find_by_field("email", storeit_core::ParamValue::String(email_ok_q))
+            .await
+            .unwrap();
+        let fail = repo
+            .find_by_field("email", storeit_core::ParamValue::String(email_fail_q))
+            .await
+            .unwrap();
+        assert_eq!(ok.len(), 1);
+        assert_eq!(fail.len(), 0);
+    }
+
     #[tokio::test]
     #[ignore = "libsql tx manager WIP - skip in default test runs"]
     async fn transaction_commit_persists() {
