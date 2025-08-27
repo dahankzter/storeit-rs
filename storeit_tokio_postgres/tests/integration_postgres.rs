@@ -727,3 +727,139 @@ async fn postgres_transaction_repository_reuse_commits() -> RepoResult<()> {
     assert_eq!(found.len(), 1);
     Ok(())
 }
+
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_find_by_id_not_found_returns_none() -> RepoResult<()> {
+    if !containers_usable() {
+        eprintln!("[integration] Skipping: Docker not available");
+        return Ok(());
+    }
+    let node = Postgres::default().start().await;
+    let port = node.get_host_port_ipv4(5432).await;
+    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
+    let client = pg_connect_with_retry(&url).await?;
+    client
+        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
+        .await
+        .map_err(RepoError::backend)?;
+
+    let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
+        &url,
+        tests_common::User::ID_COLUMN,
+        A,
+    )
+    .await?;
+
+    let res = repo.find_by_id(&i64::MAX).await?;
+    assert!(res.is_none());
+    Ok(())
+}
+
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_update_persists_and_only_target_row_changes() -> RepoResult<()> {
+    if !containers_usable() {
+        eprintln!("[integration] Skipping: Docker not available");
+        return Ok(());
+    }
+    let node = Postgres::default().start().await;
+    let port = node.get_host_port_ipv4(5432).await;
+    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
+    let client = pg_connect_with_retry(&url).await?;
+    client
+        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
+        .await
+        .map_err(RepoError::backend)?;
+
+    let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
+        &url,
+        tests_common::User::ID_COLUMN,
+        A,
+    )
+    .await?;
+
+    // Seed two users
+    let u1 = repo
+        .insert(&tests_common::User {
+            id: None,
+            email: "u1@example.com".into(),
+            active: true,
+        })
+        .await?;
+    let u2 = repo
+        .insert(&tests_common::User {
+            id: None,
+            email: "u2@example.com".into(),
+            active: true,
+        })
+        .await?;
+
+    // Update only u1
+    let mut u1_mod = u1.clone();
+    u1_mod.active = false;
+    u1_mod.email = "u1_updated@example.com".into();
+    let _ = repo.update(&u1_mod).await?;
+
+    // Fetch both and verify changes are isolated to u1
+    let f1 = repo.find_by_id(&u1.id.unwrap()).await?.unwrap();
+    let f2 = repo.find_by_id(&u2.id.unwrap()).await?.unwrap();
+    assert_eq!(f1.email, "u1_updated@example.com");
+    assert!(!f1.active);
+    assert_eq!(f2.email, "u2@example.com");
+    assert!(f2.active);
+
+    // Verify find_by_field finds exactly the updated row by new email
+    let found = repo
+        .find_by_field(
+            "email",
+            storeit_core::ParamValue::String("u1_updated@example.com".into()),
+        )
+        .await?;
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].id, u1.id);
+    Ok(())
+}
+
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_delete_idempotent() -> RepoResult<()> {
+    if !containers_usable() {
+        eprintln!("[integration] Skipping: Docker not available");
+        return Ok(());
+    }
+    let node = Postgres::default().start().await;
+    let port = node.get_host_port_ipv4(5432).await;
+    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
+    let client = pg_connect_with_retry(&url).await?;
+    client
+        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
+        .await
+        .map_err(RepoError::backend)?;
+
+    let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
+        &url,
+        tests_common::User::ID_COLUMN,
+        A,
+    )
+    .await?;
+
+    let created = repo
+        .insert(&tests_common::User {
+            id: None,
+            email: "delete@ex.com".into(),
+            active: true,
+        })
+        .await?;
+    let id = created.id.unwrap();
+
+    let first = repo.delete_by_id(&id).await?;
+    assert!(first, "first delete should return true");
+
+    let second = repo.delete_by_id(&id).await?;
+    assert!(!second, "second delete should return false (idempotent)");
+
+    let after = repo.find_by_id(&id).await?;
+    assert!(after.is_none());
+    Ok(())
+}

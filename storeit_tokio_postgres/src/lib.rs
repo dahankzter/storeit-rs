@@ -506,8 +506,37 @@ mod backend {
 
     #[cfg(test)]
     mod tests {
-        use crate::backend::to_postgres_params;
-        use storeit_core::ParamValue;
+        use super::*;
+        use crate::backend::{isolation_sql, to_postgres_params, RepoSql};
+        use storeit_core::{Fetchable, Identifiable, Insertable, ParamValue, Updatable};
+
+        // A tiny dummy entity to exercise RepoSql without any database.
+        #[derive(Clone)]
+        struct Dummy;
+        impl Fetchable for Dummy {
+            const TABLE: &'static str = "dummy";
+            const SELECT_COLUMNS: &'static [&'static str] = &["id", "name"];
+            const FINDABLE_COLUMNS: &'static [(&'static str, &'static str)] = &[("name", "TEXT")];
+        }
+        impl Identifiable for Dummy {
+            type Key = i64;
+            const ID_COLUMN: &'static str = "id";
+            fn id(&self) -> Option<Self::Key> {
+                None
+            }
+        }
+        impl Insertable for Dummy {
+            const INSERT_COLUMNS: &'static [&'static str] = &["name"];
+            fn insert_values(&self) -> Vec<ParamValue> {
+                vec![ParamValue::String("x".into())]
+            }
+        }
+        impl Updatable for Dummy {
+            const UPDATE_COLUMNS: &'static [&'static str] = &["name", "id"];
+            fn update_values(&self) -> Vec<ParamValue> {
+                vec![ParamValue::String("y".into()), ParamValue::I64(1)]
+            }
+        }
 
         // Smoke-test the ParamValue -> ToSql boxing helper. We can't downcast trait objects here,
         // but we can at least assert length and that no panic occurs for all variants.
@@ -523,6 +552,41 @@ mod backend {
             ];
             let boxed = to_postgres_params(&values);
             assert_eq!(boxed.len(), values.len());
+        }
+
+        #[test]
+        fn isolation_sql_maps_variants() {
+            // Default has no statement; others do.
+            assert!(isolation_sql(Isolation::Default).is_none());
+            assert!(isolation_sql(Isolation::ReadCommitted)
+                .unwrap()
+                .contains("READ COMMITTED"));
+            assert!(isolation_sql(Isolation::RepeatableRead)
+                .unwrap()
+                .contains("REPEATABLE READ"));
+            assert!(isolation_sql(Isolation::Serializable)
+                .unwrap()
+                .contains("SERIALIZABLE"));
+        }
+
+        #[test]
+        fn repo_sql_builds_expected_statements_and_caches() {
+            let sql = RepoSql::<Dummy>::new();
+            // Basic statements should mention table name "dummy".
+            assert!(sql.select_by_id.to_lowercase().contains("dummy"));
+            assert!(sql.delete_by_id.to_lowercase().contains("dummy"));
+            assert!(sql.insert.to_lowercase().contains("dummy"));
+            assert!(sql.update_by_id.to_lowercase().contains("dummy"));
+
+            // get_select_by_field should be deterministic and cached; repeated calls equal.
+            let f1 = sql.get_select_by_field("name");
+            let f2 = sql.get_select_by_field("name");
+            assert_eq!(f1, f2);
+            assert!(f1.to_lowercase().contains("where"));
+
+            // Different field yields a different SQL string (most likely); at least it builds.
+            let f_other = sql.get_select_by_field("id");
+            assert!(!f_other.is_empty());
         }
     }
 }
