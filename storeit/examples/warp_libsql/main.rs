@@ -23,10 +23,16 @@ pub struct User {
 pub mod users_repo {}
 
 #[derive(Clone)]
-struct AppState { db: Arc<libsql::Database>, db_url: String }
+struct AppState {
+    db: Arc<libsql::Database>,
+    db_url: String,
+}
 
 #[derive(Deserialize)]
-struct CreateUser { email: String, active: bool }
+struct CreateUser {
+    email: String,
+    active: bool,
+}
 
 #[tokio::main]
 async fn main() {
@@ -42,7 +48,10 @@ async fn main() {
     .await
     .expect("schema");
 
-    let state = AppState { db: db.clone(), db_url: db_url.clone() };
+    let state = AppState {
+        db: db.clone(),
+        db_url: db_url.clone(),
+    };
 
     let state_filter = warp::any().map(move || state.clone());
 
@@ -52,9 +61,10 @@ async fn main() {
         .and(warp::get())
         .and(state_filter.clone())
         .and_then(|id: i64, state: AppState| async move {
-            let repo: users_repo::Repository<UserRowAdapter> = users_repo::Repository::from_url_with_adapter(&state.db_url, UserRowAdapter)
-                .await
-                .map_err(|e| warp::reject::custom(StringError(format!("repo: {e:#}"))))?;
+            let repo: users_repo::Repository<UserRowAdapter> =
+                users_repo::Repository::from_url_with_adapter(&state.db_url, UserRowAdapter)
+                    .await
+                    .map_err(|e| warp::reject::custom(StringError(format!("repo: {e:#}"))))?;
             let user = repo
                 .find_by_id(&id)
                 .await
@@ -66,17 +76,19 @@ async fn main() {
         .and(warp::get())
         .and(state_filter.clone())
         .and(warp::query::<std::collections::HashMap<String, String>>())
-        .and_then(|state: AppState, params: std::collections::HashMap<String, String>| async move {
-            let email = params.get("email").cloned().unwrap_or_default();
-            let repo: users_repo::Repository<UserRowAdapter> = users_repo::Repository::from_url_with_adapter(&state.db_url, UserRowAdapter)
-                .await
-                .map_err(|e| warp::reject::custom(StringError(format!("repo: {e:#}"))))?;
-            let users = repo
-                .find_by_email(&email)
-                .await
-                .map_err(|e| warp::reject::custom(StringError(format!("find_by_email: {e:#}"))))?;
-            Ok::<_, Infallible>(warp::reply::json(&users))
-        });
+        .and_then(
+            |state: AppState, params: std::collections::HashMap<String, String>| async move {
+                let email = params.get("email").cloned().unwrap_or_default();
+                let repo: users_repo::Repository<UserRowAdapter> =
+                    users_repo::Repository::from_url_with_adapter(&state.db_url, UserRowAdapter)
+                        .await
+                        .map_err(|e| warp::reject::custom(StringError(format!("repo: {e:#}"))))?;
+                let users = repo.find_by_email(&email).await.map_err(|e| {
+                    warp::reject::custom(StringError(format!("find_by_email: {e:#}")))
+                })?;
+                Ok::<_, Infallible>(warp::reply::json(&users))
+            },
+        );
 
     let create_user = warp::path("users")
         .and(warp::post())
@@ -86,15 +98,28 @@ async fn main() {
             use storeit_core::transactions::{Isolation, Propagation, TransactionDefinition};
             use storeit_libsql::LibsqlTransactionManager;
             let mgr = LibsqlTransactionManager::from_arc(state.db.clone());
-            let def = TransactionDefinition { propagation: Propagation::Required, isolation: Isolation::Default, read_only: false, timeout: None };
+            let def = TransactionDefinition {
+                propagation: Propagation::Required,
+                isolation: Isolation::Default,
+                read_only: false,
+                timeout: None,
+            };
             let email = payload.email.clone();
             let active = payload.active;
             let created = mgr
                 .execute(&def, |_ctx| {
                     let db_url = state.db_url.clone();
                     async move {
-                        let repo: users_repo::Repository<UserRowAdapter> = users_repo::Repository::from_url_with_adapter(&db_url, UserRowAdapter).await?;
-                        let user = repo.insert(&User { id: None, email, active }).await?;
+                        let repo: users_repo::Repository<UserRowAdapter> =
+                            users_repo::Repository::from_url_with_adapter(&db_url, UserRowAdapter)
+                                .await?;
+                        let user = repo
+                            .insert(&User {
+                                id: None,
+                                email,
+                                active,
+                            })
+                            .await?;
                         Ok::<_, storeit::RepoError>(user)
                     }
                 })

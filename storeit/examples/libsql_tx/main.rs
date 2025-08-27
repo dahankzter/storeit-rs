@@ -42,24 +42,37 @@ async fn main() -> Result<(), storeit::RepoError> {
 
     // 1) A successful transaction (commit)
     {
-        use storeit_libsql::LibsqlTransactionManager;
         use storeit_core::transactions::{Isolation, Propagation, TransactionDefinition};
+        use storeit_libsql::LibsqlTransactionManager;
         #[allow(deprecated)]
-        let db = std::sync::Arc::new(libsql::Database::open(db_url).map_err(storeit::RepoError::backend)?);
+        let db = std::sync::Arc::new(
+            libsql::Database::open(db_url).map_err(storeit::RepoError::backend)?,
+        );
         let mgr = LibsqlTransactionManager::from_arc(db);
-        let def = TransactionDefinition { propagation: Propagation::Required, isolation: Isolation::Default, read_only: false, timeout: None };
+        let def = TransactionDefinition {
+            propagation: Propagation::Required,
+            isolation: Isolation::Default,
+            read_only: false,
+            timeout: None,
+        };
         let email1 = "tx_commit@sqlite".to_string();
         mgr.execute(&def, |_ctx| {
             let email1 = email1.clone();
             async move {
                 // Build a repo that participates in the active transaction
-                let repo_tx: users_repo::Repository<UserRowAdapter> = users_repo::Repository::from_url_with_adapter(db_url, UserRowAdapter).await?;
+                let repo_tx: users_repo::Repository<UserRowAdapter> =
+                    users_repo::Repository::from_url_with_adapter(db_url, UserRowAdapter).await?;
                 let _ = repo_tx
-                    .insert(&User { id: None, email: email1.clone(), active: true })
+                    .insert(&User {
+                        id: None,
+                        email: email1.clone(),
+                        active: true,
+                    })
                     .await?;
                 Ok::<_, storeit::RepoError>(())
             }
-        }).await?;
+        })
+        .await?;
         // After commit, we should see the user
         let found = repo.find_by_email(&email1).await?;
         assert_eq!(found.len(), 1);
@@ -68,24 +81,42 @@ async fn main() -> Result<(), storeit::RepoError> {
 
     // 2) A failing transaction (rollback)
     {
-        use storeit_libsql::LibsqlTransactionManager;
         use storeit_core::transactions::{Isolation, Propagation, TransactionDefinition};
+        use storeit_libsql::LibsqlTransactionManager;
         #[allow(deprecated)]
-        let db = std::sync::Arc::new(libsql::Database::open(db_url).map_err(storeit::RepoError::backend)?);
+        let db = std::sync::Arc::new(
+            libsql::Database::open(db_url).map_err(storeit::RepoError::backend)?,
+        );
         let mgr = LibsqlTransactionManager::from_arc(db);
-        let def = TransactionDefinition { propagation: Propagation::Required, isolation: Isolation::Default, read_only: false, timeout: None };
+        let def = TransactionDefinition {
+            propagation: Propagation::Required,
+            isolation: Isolation::Default,
+            read_only: false,
+            timeout: None,
+        };
         let email2 = "tx_rollback@sqlite".to_string();
-        let res = mgr.execute(&def, |_ctx| {
-            let email2 = email2.clone();
-            async move {
-                let repo_tx: users_repo::Repository<UserRowAdapter> = users_repo::Repository::from_url_with_adapter(db_url, UserRowAdapter).await?;
-                let _ = repo_tx
-                    .insert(&User { id: None, email: email2.clone(), active: true })
-                    .await?;
-                // Force an error so the tx rolls back
-                Err::<(), _>(storeit::RepoError::backend(std::io::Error::new(std::io::ErrorKind::Other, "boom")))
-            }
-        }).await;
+        let res = mgr
+            .execute(&def, |_ctx| {
+                let email2 = email2.clone();
+                async move {
+                    let repo_tx: users_repo::Repository<UserRowAdapter> =
+                        users_repo::Repository::from_url_with_adapter(db_url, UserRowAdapter)
+                            .await?;
+                    let _ = repo_tx
+                        .insert(&User {
+                            id: None,
+                            email: email2.clone(),
+                            active: true,
+                        })
+                        .await?;
+                    // Force an error so the tx rolls back
+                    Err::<(), _>(storeit::RepoError::backend(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "boom",
+                    )))
+                }
+            })
+            .await;
         assert!(res.is_err());
         let found = repo.find_by_email(&email2).await?;
         assert!(found.is_empty());

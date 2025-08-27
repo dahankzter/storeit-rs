@@ -21,49 +21,80 @@ pub struct User {
 pub mod users_repo {}
 
 #[derive(Clone)]
-struct AppState { db: Arc<libsql::Database>, db_url: String }
+struct AppState {
+    db: Arc<libsql::Database>,
+    db_url: String,
+}
 
 #[derive(Deserialize)]
-struct CreateUser { email: String, active: bool }
+struct CreateUser {
+    email: String,
+    active: bool,
+}
 
 #[get("/health")]
-async fn health() -> impl Responder { HttpResponse::Ok().body("ok") }
+async fn health() -> impl Responder {
+    HttpResponse::Ok().body("ok")
+}
 
 #[get("/users/{id}")]
-async fn get_user(state: web::Data<AppState>, path: web::Path<i64>) -> actix_web::Result<impl Responder> {
+async fn get_user(
+    state: web::Data<AppState>,
+    path: web::Path<i64>,
+) -> actix_web::Result<impl Responder> {
     let id = path.into_inner();
-    let repo: users_repo::Repository<UserRowAdapter> = users_repo::Repository::from_url_with_adapter(&state.db_url, UserRowAdapter)
-        .await
-        .map_err(to_http_err)?;
+    let repo: users_repo::Repository<UserRowAdapter> =
+        users_repo::Repository::from_url_with_adapter(&state.db_url, UserRowAdapter)
+            .await
+            .map_err(to_http_err)?;
     let user = repo.find_by_id(&id).await.map_err(to_http_err)?;
     Ok(web::Json(user))
 }
 
 #[get("/users")]
-async fn list_by_email(state: web::Data<AppState>, q: web::Query<std::collections::HashMap<String, String>>) -> actix_web::Result<impl Responder> {
+async fn list_by_email(
+    state: web::Data<AppState>,
+    q: web::Query<std::collections::HashMap<String, String>>,
+) -> actix_web::Result<impl Responder> {
     let email = q.get("email").cloned().unwrap_or_default();
-    let repo: users_repo::Repository<UserRowAdapter> = users_repo::Repository::from_url_with_adapter(&state.db_url, UserRowAdapter)
-        .await
-        .map_err(to_http_err)?;
+    let repo: users_repo::Repository<UserRowAdapter> =
+        users_repo::Repository::from_url_with_adapter(&state.db_url, UserRowAdapter)
+            .await
+            .map_err(to_http_err)?;
     let users = repo.find_by_email(&email).await.map_err(to_http_err)?;
     Ok(web::Json(users))
 }
 
 #[post("/users")]
-async fn create_user_tx(state: web::Data<AppState>, payload: web::Json<CreateUser>) -> actix_web::Result<impl Responder> {
+async fn create_user_tx(
+    state: web::Data<AppState>,
+    payload: web::Json<CreateUser>,
+) -> actix_web::Result<impl Responder> {
     use storeit_core::transactions::{Isolation, Propagation, TransactionDefinition};
     use storeit_libsql::LibsqlTransactionManager;
 
     let mgr = LibsqlTransactionManager::from_arc(state.db.clone());
-    let def = TransactionDefinition { propagation: Propagation::Required, isolation: Isolation::Default, read_only: false, timeout: None };
+    let def = TransactionDefinition {
+        propagation: Propagation::Required,
+        isolation: Isolation::Default,
+        read_only: false,
+        timeout: None,
+    };
     let email = payload.email.clone();
     let active = payload.active;
     let created = mgr
         .execute(&def, |_ctx| {
             let db_url = state.db_url.clone();
             async move {
-                let repo: users_repo::Repository<UserRowAdapter> = users_repo::Repository::from_url_with_adapter(&db_url, UserRowAdapter).await?;
-                let user = repo.insert(&User { id: None, email, active }).await?;
+                let repo: users_repo::Repository<UserRowAdapter> =
+                    users_repo::Repository::from_url_with_adapter(&db_url, UserRowAdapter).await?;
+                let user = repo
+                    .insert(&User {
+                        id: None,
+                        email,
+                        active,
+                    })
+                    .await?;
                 Ok::<_, storeit::RepoError>(user)
             }
         })
@@ -90,7 +121,10 @@ async fn main() -> std::io::Result<()> {
     .await
     .expect("schema");
 
-    let state = AppState { db: db.clone(), db_url: db_url.clone() };
+    let state = AppState {
+        db: db.clone(),
+        db_url: db_url.clone(),
+    };
 
     println!("Actix-Web listening on http://127.0.0.1:8080");
     HttpServer::new(move || {
