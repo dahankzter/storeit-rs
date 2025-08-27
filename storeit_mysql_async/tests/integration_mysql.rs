@@ -22,7 +22,7 @@ async fn acquire_it_lock() -> tokio::sync::MutexGuard<'static, ()> {
 static DB_ONCE: tokio::sync::OnceCell<(testcontainers::ContainerAsync<MariaDb>, String)> =
     tokio::sync::OnceCell::const_new();
 async fn shared_db_url() -> String {
-    let (node, url) = DB_ONCE
+    let (_node, url) = DB_ONCE
         .get_or_init(|| async {
             let node = MariaDb::default().start().await;
             let port = node.get_host_port_ipv4(3306).await;

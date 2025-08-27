@@ -576,13 +576,47 @@ mod tests {
     use storeit_core::{Repository, RowAdapter};
     use tokio::sync::Mutex as AsyncMutex;
 
-    #[derive(storeit_macros::Entity, Clone, Debug, PartialEq)]
-    #[entity(table = "users")]
+    #[derive(Clone, Debug, PartialEq)]
     struct U {
-        #[fetch(id)]
         id: Option<i64>,
         email: String,
         active: bool,
+    }
+
+    // Manually implement the core traits instead of using the derive macro, to avoid
+    // emitting cfgs (like `coverage` or `backend-adapters`) into this crate during tests.
+    impl storeit_core::Fetchable for U {
+        const TABLE: &'static str = "users";
+        const SELECT_COLUMNS: &'static [&'static str] = &["id", "email", "active"];
+        // Minimal list for tests; types are informational for the SQL builder in this workspace
+        const FINDABLE_COLUMNS: &'static [(&'static str, &'static str)] =
+            &[("email", "TEXT"), ("active", "BOOLEAN")];
+    }
+    impl storeit_core::Identifiable for U {
+        type Key = i64;
+        const ID_COLUMN: &'static str = "id";
+        fn id(&self) -> Option<Self::Key> {
+            self.id
+        }
+    }
+    impl storeit_core::Insertable for U {
+        const INSERT_COLUMNS: &'static [&'static str] = &["email", "active"];
+        fn insert_values(&self) -> Vec<storeit_core::ParamValue> {
+            vec![
+                storeit_core::ParamValue::String(self.email.clone()),
+                storeit_core::ParamValue::Bool(self.active),
+            ]
+        }
+    }
+    impl storeit_core::Updatable for U {
+        const UPDATE_COLUMNS: &'static [&'static str] = &["email", "active", "id"];
+        fn update_values(&self) -> Vec<storeit_core::ParamValue> {
+            vec![
+                storeit_core::ParamValue::String(self.email.clone()),
+                storeit_core::ParamValue::Bool(self.active),
+                storeit_core::ParamValue::I64(self.id.unwrap_or_default()),
+            ]
+        }
     }
 
     struct A;

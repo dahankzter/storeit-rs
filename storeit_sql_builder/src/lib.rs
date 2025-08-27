@@ -947,6 +947,12 @@ mod tests {
             email: String,
             active: bool,
         }
+        // Construct an instance to avoid dead_code warnings about never constructed
+        let _u_instance = U {
+            id: 1,
+            email: "a@x".into(),
+            active: true,
+        };
         let (where_sql, params) = build_where_and(&[
             ("email", storeit_core::ParamValue::String("a@x".into())),
             ("active", storeit_core::ParamValue::Bool(true)),
@@ -973,6 +979,12 @@ mod tests {
             email: String,
             active: bool,
         }
+        // Construct an instance to avoid dead_code warnings about never constructed
+        let _u2_instance = U2 {
+            id: 2,
+            email: "b@x".into(),
+            active: false,
+        };
         let groups = vec![
             vec![("email", storeit_core::ParamValue::String("a@x".into()))],
             vec![("active", storeit_core::ParamValue::Bool(true))],

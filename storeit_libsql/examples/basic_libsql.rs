@@ -3,15 +3,41 @@
 #[cfg(feature = "libsql-backend")]
 fn main() -> Result<(), storeit_core::RepoError> {
     use libsql::Database;
-    use storeit_core::{Fetchable, RepoError, RowAdapter};
+    use storeit_core::{RepoError, RowAdapter};
     use storeit_libsql::LibsqlRepository;
 
-    #[derive(storeit_macros::Entity, Clone, Debug)]
-    #[entity(table = "users")]
+    #[derive(Clone, Debug)]
     struct User {
-        #[fetch(id)]
         id: Option<i64>,
         email: String,
+    }
+
+    impl storeit_core::Fetchable for User {
+        const TABLE: &'static str = "users";
+        const SELECT_COLUMNS: &'static [&'static str] = &["id", "email"];
+        const FINDABLE_COLUMNS: &'static [(&'static str, &'static str)] = &[("email", "TEXT")];
+    }
+    impl storeit_core::Identifiable for User {
+        type Key = i64;
+        const ID_COLUMN: &'static str = "id";
+        fn id(&self) -> Option<Self::Key> {
+            self.id
+        }
+    }
+    impl storeit_core::Insertable for User {
+        const INSERT_COLUMNS: &'static [&'static str] = &["email"];
+        fn insert_values(&self) -> Vec<storeit_core::ParamValue> {
+            vec![storeit_core::ParamValue::String(self.email.clone())]
+        }
+    }
+    impl storeit_core::Updatable for User {
+        const UPDATE_COLUMNS: &'static [&'static str] = &["email", "id"];
+        fn update_values(&self) -> Vec<storeit_core::ParamValue> {
+            vec![
+                storeit_core::ParamValue::String(self.email.clone()),
+                storeit_core::ParamValue::I64(self.id.unwrap_or_default()),
+            ]
+        }
     }
 
     struct UserAdapter;

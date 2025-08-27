@@ -130,9 +130,9 @@ coverage-all: tools
 	# 1) Workspace (all features), no report yet
 	$(CARGO) llvm-cov --workspace --all-features --no-report
 	# 2) Merge backend integrations (ignored tests) per package
-	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_libsql --features libsql-backend --no-report -- --ignored
-	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_mysql_async --features mysql-async --no-report -- --ignored
-	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_tokio_postgres --features postgres-backend --no-report -- --ignored
+	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_libsql --all-features --no-report -- --ignored
+	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_mysql_async --all-features --no-report -- --ignored
+	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_tokio_postgres --all-features --no-report -- --ignored
 	# 3) Emit final HTML report and open it
 	$(CARGO) llvm-cov report --html
 	@if [ -f "$(COV_HTML_INDEX)" ]; then \
@@ -146,9 +146,9 @@ coverage-all: tools
 coverage-all-summary: tools
 	$(CARGO) llvm-cov clean --workspace
 	$(CARGO) llvm-cov --workspace --all-features --no-report
-	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_libsql --features libsql-backend --no-report -- --ignored
-	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_mysql_async --features mysql-async --no-report -- --ignored
-	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_tokio_postgres --features postgres-backend --no-report -- --ignored
+	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_libsql --all-features --no-report -- --ignored
+	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_mysql_async --all-features --no-report -- --ignored
+	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) llvm-cov --package storeit_tokio_postgres --all-features --no-report -- --ignored
 	$(CARGO) llvm-cov report --summary-only
 
 

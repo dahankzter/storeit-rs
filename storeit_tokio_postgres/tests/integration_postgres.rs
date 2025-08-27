@@ -880,16 +880,3 @@ async fn postgres_delete_idempotent() -> RepoResult<()> {
     assert!(after.is_none());
     Ok(())
 }
-
-// --- Refinery migrations helper (embedded) ---
-mod pg_migrations {
-    use refinery::embed_migrations;
-    embed_migrations!("../tests_common/migrations/postgres");
-}
-async fn apply_pg_migrations(client: &mut tokio_postgres::Client) -> RepoResult<()> {
-    pg_migrations::migrations::runner()
-        .run_async(client)
-        .await
-        .map(|_| ())
-        .map_err(RepoError::backend)
-}

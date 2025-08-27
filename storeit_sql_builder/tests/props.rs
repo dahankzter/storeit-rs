@@ -3,6 +3,13 @@
 use proptest::prelude::*;
 use storeit_macros::Entity;
 
+#[test]
+fn cover_placeholder_variants() {
+    // Ensure both variants are referenced so the enum variants are considered constructed
+    let _d = Placeholder::Dollar;
+    let _q = Placeholder::Question;
+}
+
 #[derive(Entity)]
 #[entity(table = "people_props")]
 struct PersonP {

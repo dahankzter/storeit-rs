@@ -12,6 +12,9 @@ struct TxDemoEntity {
 async fn generated_tx_manager_executes_closure() {
     // Use the default backend-agnostic template for this test.
     let tpl = default_transaction_template();
+    // Construct the demo entity once to ensure the derive-generated type is fully exercised
+    let _demo = TxDemoEntity { id: None };
+
     let out = tpl
         .execute(|_ctx: TransactionContext| async move { Ok::<_, storeit::RepoError>(40 + 2) })
         .await
