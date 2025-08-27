@@ -228,38 +228,60 @@ mod backend {
                     .map(to_mysql_value)
                     .collect(),
             );
-            let (new_id, ()) =
-                if let Ok(Some(arc)) = MY_TX_CONN.try_with(|c| c.borrow().as_ref().cloned()) {
-                    let mut conn = arc.lock().await;
-                    let mut result = conn
-                        .exec_iter(self.sql.insert.clone(), params)
-                        .await
-                        .map_err(RepoError::backend)?;
-                    let new_id = result.last_insert_id().unwrap_or(0);
-                    result.map(|_| ()).await.map_err(RepoError::backend)?;
-                    (new_id, ())
+
+            // Execute the INSERT and capture the last_insert_id. Then fetch the row back
+            // using the raw id value directly to avoid fragile generic conversions.
+            if let Ok(Some(arc)) = MY_TX_CONN.try_with(|c| c.borrow().as_ref().cloned()) {
+                let mut conn = arc.lock().await;
+                let mut result = conn
+                    .exec_iter(self.sql.insert.clone(), params)
+                    .await
+                    .map_err(RepoError::backend)?;
+                let new_id = result.last_insert_id().unwrap_or(0);
+                result.map(|_| ()).await.map_err(RepoError::backend)?;
+
+                // Fetch back
+                let row: Option<Row> = conn
+                    .exec_first(
+                        self.sql.select_by_id.clone(),
+                        Params::Positional(vec![Value::from(new_id)]),
+                    )
+                    .await
+                    .map_err(RepoError::backend)?;
+                if let Some(row) = row {
+                    Ok(self.adapter.from_row(&row)?)
                 } else {
-                    let mut conn = self.get_conn().await?;
-                    let mut result = conn
-                        .exec_iter(self.sql.insert.clone(), params)
-                        .await
-                        .map_err(RepoError::backend)?;
-                    let new_id = result.last_insert_id().unwrap_or(0);
-                    result.map(|_| ()).await.map_err(RepoError::backend)?;
-                    (new_id, ())
-                };
-
-            let key_val: T::Key = serde_json::from_value(serde_json::Value::from(new_id))
-                .map_err(RepoError::backend)?;
-
-            self.find_by_id(&key_val).await.and_then(|opt| {
-                opt.ok_or_else(|| {
-                    RepoError::backend(std::io::Error::new(
+                    Err(RepoError::backend(std::io::Error::new(
                         std::io::ErrorKind::Other,
                         "failed to fetch entity after insert",
-                    ))
-                })
-            })
+                    )))
+                }
+            } else {
+                let mut conn = self.get_conn().await?;
+                let mut result = conn
+                    .exec_iter(self.sql.insert.clone(), params)
+                    .await
+                    .map_err(RepoError::backend)?;
+                let new_id = result.last_insert_id().unwrap_or(0);
+                result.map(|_| ()).await.map_err(RepoError::backend)?;
+
+                // Fetch back
+                let row: Option<Row> = conn
+                    .exec_first(
+                        self.sql.select_by_id.clone(),
+                        Params::Positional(vec![Value::from(new_id)]),
+                    )
+                    .await
+                    .map_err(RepoError::backend)?;
+                if let Some(row) = row {
+                    Ok(self.adapter.from_row(&row)?)
+                } else {
+                    Err(RepoError::backend(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "failed to fetch entity after insert",
+                    )))
+                }
+            }
         }
 
         async fn update(&self, entity: &T) -> RepoResult<T> {

@@ -419,7 +419,7 @@ mod backend {
                     .await
                     .map_err(RepoError::backend)?,
                 ParamValue::Null => client
-                    .query(&sql, &[&Option::<i32>::None])
+                    .query(&sql, &[&Option::<bool>::None])
                     .await
                     .map_err(RepoError::backend)?,
             };

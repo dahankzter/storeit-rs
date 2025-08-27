@@ -22,7 +22,7 @@ metrics = { version = "0.21", optional = true }
 [dev-dependencies]
 # containerized mysql and shared test helpers
 testcontainers = "0.16"
-testcontainers-modules = { version = "0.4", features = ["mysql"] }
+testcontainers-modules = { version = "0.4", features = ["mysql", "mariadb"] }
 tests_common = { path = "../tests_common" }
 
 [features]

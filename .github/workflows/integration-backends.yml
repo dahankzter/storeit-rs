@@ -1,27 +1,17 @@
-name: Integration Backends (containers)
+name: Integration backends (Docker + coverage summary)
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '15 3 * * *'  # daily at 03:15 UTC
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  run-integration-tests:
-    name: integration (${{ matrix.backend }})
+  integration-and-coverage:
+    name: ubuntu-latest (Docker)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - backend: libsql
-            package: storeit_libsql
-            features: libsql-backend
-          - backend: postgres
-            package: storeit_tokio_postgres
-            features: postgres-backend
-          - backend: mysql
-            package: storeit_mysql_async
-            features: mysql-async
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,20 +20,36 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
+          components: rustfmt, clippy
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Docker info
-        run: docker version || true
+      - name: Install coverage tools
+        run: |
+          rustup component add llvm-tools-preview
+          if ! command -v cargo-llvm-cov >/dev/null 2>&1; then
+            cargo install cargo-llvm-cov --locked
+          else
+            echo "cargo-llvm-cov already installed"
+          fi
 
-      - name: Run ignored integration tests with containers
+      - name: Verify build (workspace)
+        run: |
+          cargo build --workspace --all-features
+
+      - name: Run integration tests (containers) and coverage summary
         env:
-          # Ensure tests try to use containers (they also skip gracefully if Docker is unavailable)
-          SKIP_CONTAINER_TESTS: "0"
-        run: >-
-          cargo test
-          --package ${{ matrix.package }}
-          --no-default-features
-          --features ${{ matrix.features }}
-          -- --ignored --nocapture
+          RUN_CONTAINERS: "1"
+        run: |
+          make coverage-all-summary
+
+      - name: Upload coverage summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-summary
+          path: |
+            target/llvm-cov/
+            lcov.info
+          if-no-files-found: ignore
