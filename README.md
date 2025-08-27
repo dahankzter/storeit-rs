@@ -6,7 +6,16 @@
 [![Crates.io](https://img.shields.io/crates/v/storeit.svg)](https://crates.io/crates/storeit)
 [![Docs.rs](https://docs.rs/storeit/badge.svg)](https://docs.rs/storeit)
 
-Generate Spring Data–style SQL repositories with Rust proc-macros.
+```text
+   ____  _                 
+  / ___|| |_ ___  _ __ ___ 
+  \___ \| __/ _ \| '__/ _ \
+   ___) | || (_) | | |  __/
+  |____/ \__\___/|_|  \___|   repositories for Rust
+```
+
+Type-safe, async SQL repositories for Rust — derive your entities and get ergonomic CRUD for Postgres, MySQL, and LibSQL.
+No heavy ORM; you keep full control over the SQL. Powered by lightweight proc‑macros and small backend adapters.
 
 Workspace crates:
 - storeit_core: core traits/helpers
