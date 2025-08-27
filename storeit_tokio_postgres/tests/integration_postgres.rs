@@ -388,11 +388,18 @@ async fn postgres_transaction_commit_persists_using_manager() -> RepoResult<()> 
         .await
         .map_err(RepoError::backend)?;
 
-    use storeit_core::transactions::{Isolation, Propagation, TransactionDefinition, TransactionManager};
+    use storeit_core::transactions::{
+        Isolation, Propagation, TransactionDefinition, TransactionManager,
+    };
     use storeit_tokio_postgres::TokioPostgresTransactionManager;
 
     let mgr = TokioPostgresTransactionManager::new(url.clone());
-    let def = TransactionDefinition { propagation: Propagation::Required, isolation: Isolation::Default, read_only: false, timeout: None };
+    let def = TransactionDefinition {
+        propagation: Propagation::Required,
+        isolation: Isolation::Default,
+        read_only: false,
+        timeout: None,
+    };
     let email = "tx_commit@pg.example".to_string();
 
     let res = mgr
@@ -400,9 +407,18 @@ async fn postgres_transaction_commit_persists_using_manager() -> RepoResult<()> 
             let url = url.clone();
             let email = email.clone();
             async move {
-                let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(&url, tests_common::User::ID_COLUMN, A).await?;
+                let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
+                    &url,
+                    tests_common::User::ID_COLUMN,
+                    A,
+                )
+                .await?;
                 let _ = repo
-                    .insert(&tests_common::User { id: None, email: email.clone(), active: true })
+                    .insert(&tests_common::User {
+                        id: None,
+                        email: email.clone(),
+                        active: true,
+                    })
                     .await?;
                 Ok::<_, RepoError>(())
             }
@@ -411,7 +427,12 @@ async fn postgres_transaction_commit_persists_using_manager() -> RepoResult<()> 
     assert!(res.is_ok(), "transaction should commit: {:?}", res);
 
     // After commit, the row should be visible via a fresh repo
-    let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(&url, tests_common::User::ID_COLUMN, A).await?;
+    let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
+        &url,
+        tests_common::User::ID_COLUMN,
+        A,
+    )
+    .await?;
     let found = repo
         .find_by_field("email", storeit_core::ParamValue::String(email))
         .await?;
@@ -436,19 +457,35 @@ async fn postgres_read_only_tx_prevents_writes() -> RepoResult<()> {
         .await
         .map_err(RepoError::backend)?;
 
-    use storeit_core::transactions::{Isolation, Propagation, TransactionDefinition, TransactionManager};
+    use storeit_core::transactions::{
+        Isolation, Propagation, TransactionDefinition, TransactionManager,
+    };
     use storeit_tokio_postgres::TokioPostgresTransactionManager;
     let mgr = TokioPostgresTransactionManager::new(url.clone());
 
     // Read-only tx should fail on write
-    let def_ro = TransactionDefinition { propagation: Propagation::Required, isolation: Isolation::Default, read_only: true, timeout: None };
+    let def_ro = TransactionDefinition {
+        propagation: Propagation::Required,
+        isolation: Isolation::Default,
+        read_only: true,
+        timeout: None,
+    };
     let res = mgr
         .execute(&def_ro, |_ctx| {
             let url = url.clone();
             async move {
-                let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(&url, tests_common::User::ID_COLUMN, A).await?;
+                let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
+                    &url,
+                    tests_common::User::ID_COLUMN,
+                    A,
+                )
+                .await?;
                 let err = repo
-                    .insert(&tests_common::User { id: None, email: "ro@example.com".into(), active: true })
+                    .insert(&tests_common::User {
+                        id: None,
+                        email: "ro@example.com".into(),
+                        active: true,
+                    })
                     .await
                     .expect_err("write should fail in read-only tx");
                 let _ = err; // ensure surfaced
@@ -456,12 +493,24 @@ async fn postgres_read_only_tx_prevents_writes() -> RepoResult<()> {
             }
         })
         .await;
-    assert!(res.is_ok(), "outer execute should succeed while inner write fails");
+    assert!(
+        res.is_ok(),
+        "outer execute should succeed while inner write fails"
+    );
 
     // Outside tx, write should succeed
-    let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(&url, tests_common::User::ID_COLUMN, A).await?;
+    let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
+        &url,
+        tests_common::User::ID_COLUMN,
+        A,
+    )
+    .await?;
     let created = repo
-        .insert(&tests_common::User { id: None, email: "rw@example.com".into(), active: true })
+        .insert(&tests_common::User {
+            id: None,
+            email: "rw@example.com".into(),
+            active: true,
+        })
         .await?;
     assert!(repo.find_by_id(&created.id.unwrap()).await?.is_some());
     Ok(())
@@ -484,11 +533,18 @@ async fn postgres_nested_savepoints_commit_and_rollback() -> RepoResult<()> {
         .await
         .map_err(RepoError::backend)?;
 
-    use storeit_core::transactions::{Isolation, Propagation, TransactionDefinition, TransactionManager};
+    use storeit_core::transactions::{
+        Isolation, Propagation, TransactionDefinition, TransactionManager,
+    };
     use storeit_tokio_postgres::TokioPostgresTransactionManager;
 
     let mgr = TokioPostgresTransactionManager::new(url.clone());
-    let outer = TransactionDefinition { propagation: Propagation::Required, isolation: Isolation::Default, read_only: false, timeout: None };
+    let outer = TransactionDefinition {
+        propagation: Propagation::Required,
+        isolation: Isolation::Default,
+        read_only: false,
+        timeout: None,
+    };
 
     let email_ok = "inner_ok@pg".to_string();
     let email_fail = "inner_fail@pg".to_string();
@@ -501,15 +557,29 @@ async fn postgres_nested_savepoints_commit_and_rollback() -> RepoResult<()> {
             let email_fail = email_fail.clone();
             async move {
                 // Inner successful nested tx
-                let inner_ok = TransactionDefinition { propagation: Propagation::Nested, isolation: Isolation::Default, read_only: false, timeout: None };
+                let inner_ok = TransactionDefinition {
+                    propagation: Propagation::Nested,
+                    isolation: Isolation::Default,
+                    read_only: false,
+                    timeout: None,
+                };
                 let _ = mgr
                     .execute(&inner_ok, |_ctx| {
                         let url = url.clone();
                         let email_ok = email_ok.clone();
                         async move {
-                            let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(&url, tests_common::User::ID_COLUMN, A).await?;
+                            let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
+                                &url,
+                                tests_common::User::ID_COLUMN,
+                                A,
+                            )
+                            .await?;
                             let _ = repo
-                                .insert(&tests_common::User { id: None, email: email_ok, active: true })
+                                .insert(&tests_common::User {
+                                    id: None,
+                                    email: email_ok,
+                                    active: true,
+                                })
                                 .await?;
                             Ok::<_, RepoError>(())
                         }
@@ -517,17 +587,34 @@ async fn postgres_nested_savepoints_commit_and_rollback() -> RepoResult<()> {
                     .await?;
 
                 // Inner failing nested tx -> rollback
-                let inner_fail = TransactionDefinition { propagation: Propagation::Nested, isolation: Isolation::Default, read_only: false, timeout: None };
+                let inner_fail = TransactionDefinition {
+                    propagation: Propagation::Nested,
+                    isolation: Isolation::Default,
+                    read_only: false,
+                    timeout: None,
+                };
                 let _ = mgr
                     .execute::<(), _, _>(&inner_fail, |_ctx| {
                         let url = url.clone();
                         let email_fail = email_fail.clone();
                         async move {
-                            let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(&url, tests_common::User::ID_COLUMN, A).await?;
+                            let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
+                                &url,
+                                tests_common::User::ID_COLUMN,
+                                A,
+                            )
+                            .await?;
                             let _ = repo
-                                .insert(&tests_common::User { id: None, email: email_fail, active: false })
+                                .insert(&tests_common::User {
+                                    id: None,
+                                    email: email_fail,
+                                    active: false,
+                                })
                                 .await?;
-                            Err::<(), RepoError>(RepoError::backend(std::io::Error::new(std::io::ErrorKind::Other, "boom")))
+                            Err::<(), RepoError>(RepoError::backend(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                "boom",
+                            )))
                         }
                     })
                     .await
@@ -540,12 +627,23 @@ async fn postgres_nested_savepoints_commit_and_rollback() -> RepoResult<()> {
     assert!(res.is_ok(), "outer should commit");
 
     // Verify only inner_ok row exists
-    let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(&url, tests_common::User::ID_COLUMN, A).await?;
+    let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
+        &url,
+        tests_common::User::ID_COLUMN,
+        A,
+    )
+    .await?;
     let ok = repo
-        .find_by_field("email", storeit_core::ParamValue::String("inner_ok@pg".into()))
+        .find_by_field(
+            "email",
+            storeit_core::ParamValue::String("inner_ok@pg".into()),
+        )
         .await?;
     let fail = repo
-        .find_by_field("email", storeit_core::ParamValue::String("inner_fail@pg".into()))
+        .find_by_field(
+            "email",
+            storeit_core::ParamValue::String("inner_fail@pg".into()),
+        )
         .await?;
     assert_eq!(ok.len(), 1);
     assert_eq!(fail.len(), 0);
@@ -570,13 +668,31 @@ async fn postgres_transaction_repository_reuse_commits() -> RepoResult<()> {
         .map_err(RepoError::backend)?;
 
     // Prebuild a repository OUTSIDE any transaction and reuse it inside.
-    let repo_outside = TokioPostgresRepository::<tests_common::User, A>::from_url(&url, tests_common::User::ID_COLUMN, A).await?;
+    let repo_outside = TokioPostgresRepository::<tests_common::User, A>::from_url(
+        &url,
+        tests_common::User::ID_COLUMN,
+        A,
+    )
+    .await?;
 
-    use storeit_core::transactions::{Isolation, Propagation, TransactionDefinition, TransactionManager};
+    use storeit_core::transactions::{
+        Isolation, Propagation, TransactionDefinition, TransactionManager,
+    };
     use storeit_tokio_postgres::TokioPostgresTransactionManager;
     let mgr = TokioPostgresTransactionManager::new(url.clone());
-    let def = TransactionDefinition { propagation: Propagation::Required, isolation: Isolation::Default, read_only: false, timeout: None };
-    let email = format!("reuse_{}@pg", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+    let def = TransactionDefinition {
+        propagation: Propagation::Required,
+        isolation: Isolation::Default,
+        read_only: false,
+        timeout: None,
+    };
+    let email = format!(
+        "reuse_{}@pg",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
 
     let res = mgr
         .execute(&def, |_ctx| {
@@ -584,7 +700,11 @@ async fn postgres_transaction_repository_reuse_commits() -> RepoResult<()> {
             let email = email.clone();
             async move {
                 let created = repo
-                    .insert(&tests_common::User { id: None, email: email.clone(), active: true })
+                    .insert(&tests_common::User {
+                        id: None,
+                        email: email.clone(),
+                        active: true,
+                    })
                     .await?;
                 // Visible inside the same transaction
                 assert!(repo.find_by_id(&created.id.unwrap()).await?.is_some());
@@ -595,7 +715,12 @@ async fn postgres_transaction_repository_reuse_commits() -> RepoResult<()> {
     assert!(res.is_ok(), "transaction should commit");
 
     // After commit, a fresh repository should see the row
-    let repo_fresh = TokioPostgresRepository::<tests_common::User, A>::from_url(&url, tests_common::User::ID_COLUMN, A).await?;
+    let repo_fresh = TokioPostgresRepository::<tests_common::User, A>::from_url(
+        &url,
+        tests_common::User::ID_COLUMN,
+        A,
+    )
+    .await?;
     let found = repo_fresh
         .find_by_field("email", storeit_core::ParamValue::String(email))
         .await?;

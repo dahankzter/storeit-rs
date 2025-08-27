@@ -757,7 +757,11 @@ mod tests {
                     #[allow(deprecated)]
                     let repo: LibsqlRepository<U, A> = LibsqlRepository::new(db_in.clone(), A);
                     let err = repo
-                        .insert(&U { id: None, email: "ro@x".into(), active: true })
+                        .insert(&U {
+                            id: None,
+                            email: "ro@x".into(),
+                            active: true,
+                        })
                         .await
                         .expect_err("write should fail in read-only tx");
                     let _ = err; // just ensure error surfaced
@@ -771,10 +775,18 @@ mod tests {
         // Outside transactions we can write fine
         let repo2: LibsqlRepository<U, A> = LibsqlRepository::new(db.clone(), A);
         let created = repo2
-            .insert(&U { id: None, email: "rw@x".into(), active: true })
+            .insert(&U {
+                id: None,
+                email: "rw@x".into(),
+                active: true,
+            })
             .await
             .expect("insert outside tx");
-        assert!(repo2.find_by_id(&created.id.unwrap()).await.unwrap().is_some());
+        assert!(repo2
+            .find_by_id(&created.id.unwrap())
+            .await
+            .unwrap()
+            .is_some());
     }
 
     // Nested savepoint paths: one inner commit (RELEASE) and one inner rollback (ROLLBACK TO SAVEPOINT)
@@ -814,9 +826,14 @@ mod tests {
                         .execute(&inner_ok, move |_ctx| {
                             let db1 = db1.clone();
                             async move {
-                                let repo: LibsqlRepository<U, A> = LibsqlRepository::new(db1.clone(), A);
+                                let repo: LibsqlRepository<U, A> =
+                                    LibsqlRepository::new(db1.clone(), A);
                                 let _ = repo
-                                    .insert(&U { id: None, email: email_ok.clone(), active: true })
+                                    .insert(&U {
+                                        id: None,
+                                        email: email_ok.clone(),
+                                        active: true,
+                                    })
                                     .await?;
                                 Ok::<_, storeit_core::RepoError>(())
                             }
@@ -835,13 +852,21 @@ mod tests {
                         .execute::<(), _, _>(&inner_fail, move |_ctx| {
                             let db2 = db2.clone();
                             async move {
-                                let repo: LibsqlRepository<U, A> = LibsqlRepository::new(db2.clone(), A);
+                                let repo: LibsqlRepository<U, A> =
+                                    LibsqlRepository::new(db2.clone(), A);
                                 let _ = repo
-                                    .insert(&U { id: None, email: email_fail.clone(), active: false })
+                                    .insert(&U {
+                                        id: None,
+                                        email: email_fail.clone(),
+                                        active: false,
+                                    })
                                     .await?;
-                                Err::<(), storeit_core::RepoError>(storeit_core::RepoError::backend(
-                                    std::io::Error::new(std::io::ErrorKind::Other, "boom"),
-                                ))
+                                Err::<(), storeit_core::RepoError>(
+                                    storeit_core::RepoError::backend(std::io::Error::new(
+                                        std::io::ErrorKind::Other,
+                                        "boom",
+                                    )),
+                                )
                             }
                         })
                         .await
