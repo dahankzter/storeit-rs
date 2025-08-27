@@ -1,5 +1,7 @@
 # storeit-rs
 
+[![Coverage Status](https://coveralls.io/repos/github/dahankzter/storeit-rs/badge.svg?branch=main)](https://coveralls.io/github/dahankzter/storeit-rs?branch=main)
+
 Generate Spring Data–style SQL repositories with Rust proc-macros.
 
 Workspace crates:
