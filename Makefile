@@ -117,6 +117,11 @@ integration-backends:
 	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) test -p storeit_mysql_async --features mysql-async -- --ignored
 	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) test -p storeit_tokio_postgres --features postgres-backend -- --ignored
 
+# Run only Postgres integration tests (requires Docker)
+.PHONY: integration-postgres
+integration-postgres:
+	SKIP_CONTAINER_TESTS=$(SKIP_CONTAINER_TESTS) $(CARGO) test -p storeit_tokio_postgres --features postgres-backend -- --ignored
+
 # Full coverage including (optionally) container-based integration tests.
 # - Default: skip container tests and generate merged HTML coverage for the workspace.
 # - With containers: RUN_CONTAINERS=1 make coverage-all (sets SKIP_CONTAINER_TESTS=0)

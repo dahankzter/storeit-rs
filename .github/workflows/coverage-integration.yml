@@ -1,0 +1,75 @@
+name: Coverage (integration backends)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  coverage-integration:
+    name: Linux + Docker (integration coverage)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Ensure Docker is available
+        run: |
+          docker --version
+          docker info
+
+      - name: Install cargo-llvm-cov and components
+        run: |
+          rustup component add llvm-tools-preview
+          cargo install cargo-llvm-cov --locked || true
+
+      - name: Run coverage with containers (Postgres + others)
+        env:
+          RUN_CONTAINERS: "1"
+          SKIP_CONTAINER_TESTS: "0"
+        run: |
+          make coverage-all-summary
+
+      - name: Generate HTML and LCOV artifacts (optional)
+        env:
+          RUN_CONTAINERS: "1"
+          SKIP_CONTAINER_TESTS: "0"
+        run: |
+          cargo llvm-cov report --html
+          cargo llvm-cov report --lcov --output-path lcov.info
+
+      - name: Upload coverage summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-summary.txt
+          path: |
+            target/llvm-cov/summary.txt
+          if-no-files-found: warn
+
+      - name: Upload coverage HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: |
+            target/llvm-cov/html
+          if-no-files-found: warn
+
+      - name: Upload LCOV
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: |
+            lcov.info
+          if-no-files-found: warn
