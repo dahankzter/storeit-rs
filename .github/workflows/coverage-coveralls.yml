@@ -32,10 +32,21 @@ jobs:
             echo "cargo-llvm-cov already installed"
           fi
 
-      - name: Generate coverage (lcov)
+      - name: Generate merged coverage including integration tests (lcov)
+        env:
+          RUN_CONTAINERS: "1"           # request running container-based tests
+          SKIP_CONTAINER_TESTS: "0"     # ensure ignored integration tests run
         run: |
+          set -euo pipefail
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
+          # 1) Workspace (all features), no report yet
+          cargo llvm-cov --workspace --all-features --no-report
+          # 2) Merge backend integrations (ignored tests) per package
+          SKIP_CONTAINER_TESTS=0 cargo llvm-cov --package storeit_libsql --all-features --no-report -- --ignored
+          SKIP_CONTAINER_TESTS=0 cargo llvm-cov --package storeit_mysql_async --all-features --no-report -- --ignored
+          SKIP_CONTAINER_TESTS=0 cargo llvm-cov --package storeit_tokio_postgres --all-features --no-report -- --ignored
+          # 3) Emit final LCOV report
+          cargo llvm-cov report --lcov --output-path lcov.info
 
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
