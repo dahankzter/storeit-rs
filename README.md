@@ -1,6 +1,10 @@
 # storeit-rs
 
+[![CI (Cross-platform)](https://github.com/dahankzter/storeit-rs/actions/workflows/cross-platform.yml/badge.svg?branch=main)](https://github.com/dahankzter/storeit-rs/actions/workflows/cross-platform.yml)
+[![Integration backends](https://github.com/dahankzter/storeit-rs/actions/workflows/integration-backends.yml/badge.svg?branch=main)](https://github.com/dahankzter/storeit-rs/actions/workflows/integration-backends.yml)
 [![Coverage Status](https://coveralls.io/repos/github/dahankzter/storeit-rs/badge.svg?branch=main)](https://coveralls.io/github/dahankzter/storeit-rs?branch=main)
+[![Crates.io](https://img.shields.io/crates/v/storeit.svg)](https://crates.io/crates/storeit)
+[![Docs.rs](https://docs.rs/storeit/badge.svg)](https://docs.rs/storeit)
 
 Generate Spring Data–style SQL repositories with Rust proc-macros.
 

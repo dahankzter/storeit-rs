@@ -1,12 +1,15 @@
 # storeit_libsql
 
+[![Crates.io](https://img.shields.io/crates/v/storeit_libsql.svg)](https://crates.io/crates/storeit_libsql)
+[![Docs.rs](https://docs.rs/storeit_libsql/badge.svg)](https://docs.rs/storeit_libsql)
+
 LibSQL/Turso backend adapter for the `storeit` repository framework.
 
 - Feature: `libsql-backend` enables the implementation using the `libsql` crate and Tokio runtime.
 - Implements the async `Repository<T>` for your entities and provides a `LibsqlTransactionManager` for transaction semantics (including nested savepoints).
 
 Quick start:
-```rust
+```ignore
 use storeit_core::{RowAdapter, Repository};
 use storeit_libsql::LibsqlRepository;
 

@@ -1,5 +1,8 @@
 # storeit_core
 
+[![Crates.io](https://img.shields.io/crates/v/storeit_core.svg)](https://crates.io/crates/storeit_core)
+[![Docs.rs](https://docs.rs/storeit_core/badge.svg)](https://docs.rs/storeit_core)
+
 Core traits, errors, and transaction abstractions for the storeit repository framework.
 
 This crate is backend-agnostic. It defines:

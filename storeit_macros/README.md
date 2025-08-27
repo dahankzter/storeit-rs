@@ -1,5 +1,8 @@
 # storeit_macros
 
+[![Crates.io](https://img.shields.io/crates/v/storeit_macros.svg)](https://crates.io/crates/storeit_macros)
+[![Docs.rs](https://docs.rs/storeit_macros/badge.svg)](https://docs.rs/storeit_macros)
+
 Procedural macros for the storeit repository framework.
 
 What it provides:

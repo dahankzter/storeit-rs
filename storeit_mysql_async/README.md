@@ -1,12 +1,15 @@
 # storeit_mysql_async
 
+[![Crates.io](https://img.shields.io/crates/v/storeit_mysql_async.svg)](https://crates.io/crates/storeit_mysql_async)
+[![Docs.rs](https://docs.rs/storeit_mysql_async/badge.svg)](https://docs.rs/storeit_mysql_async)
+
 MySQL backend adapter for `storeit`, built on `mysql_async`.
 
 - Feature: `mysql-async` enables the implementation using the mysql_async crate and Tokio runtime.
 - Provides `MysqlAsyncRepository<T, A>` and a `MysqlAsyncTransactionManager`.
 
 Quick start:
-```rust
+```ignore
 use storeit_core::{RowAdapter, Repository};
 use storeit_mysql_async::MysqlAsyncRepository;
 

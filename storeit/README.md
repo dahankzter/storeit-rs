@@ -1,5 +1,8 @@
 # storeit
 
+[![Crates.io](https://img.shields.io/crates/v/storeit.svg)](https://crates.io/crates/storeit)
+[![Docs.rs](https://docs.rs/storeit/badge.svg)](https://docs.rs/storeit)
+
 Facade crate for the `storeit` repository framework.
 
 This crate re-exports the core traits and macros so you can get started with a single dependency and feature flags to choose your backend(s).

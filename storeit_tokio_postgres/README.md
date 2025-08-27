@@ -1,12 +1,15 @@
 # storeit_tokio_postgres
 
+[![Crates.io](https://img.shields.io/crates/v/storeit_tokio_postgres.svg)](https://crates.io/crates/storeit_tokio_postgres)
+[![Docs.rs](https://docs.rs/storeit_tokio_postgres/badge.svg)](https://docs.rs/storeit_tokio_postgres)
+
 PostgreSQL backend adapter for `storeit`, built on `tokio-postgres`.
 
 - Feature: `postgres-backend` enables the implementation using tokio-postgres and Tokio runtime.
 - Provides `TokioPostgresRepository<T, A>` and `TokioPostgresTransactionManager`.
 
 Quick start:
-```rust
+```ignore
 use storeit_core::{RowAdapter, Repository};
 use storeit_tokio_postgres::TokioPostgresRepository;
 
