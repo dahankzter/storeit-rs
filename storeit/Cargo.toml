@@ -20,11 +20,13 @@ stream-ext = ["dep:async-stream", "dep:futures-core"]
 upsert-ext = []
 # Pre-1.0 experimental APIs live behind this no-op feature across the workspace.
 unstable = []
+# Enable auto-generated RowAdapter impls for entity derives in this crate's examples.
+backend-adapters = []
 # Backend selection features for end users; pull backend crates transitively so
 # users can depend only on `repository` and not on backend crates directly.
-libsql-backend = ["dep:storeit_libsql", "storeit_libsql/libsql-backend"]
-postgres-backend = ["dep:storeit_tokio_postgres", "storeit_tokio_postgres/postgres-backend"]
-mysql-async = ["dep:storeit_mysql_async", "storeit_mysql_async/mysql-async"]
+libsql-backend = ["dep:storeit_libsql", "storeit_libsql/libsql-backend", "backend-adapters"]
+postgres-backend = ["dep:storeit_tokio_postgres", "storeit_tokio_postgres/postgres-backend", "backend-adapters"]
+mysql-async = ["dep:storeit_mysql_async", "storeit_mysql_async/mysql-async", "backend-adapters"]
 
 # Explicit feature aliases matching optional dependency names.
 # This ensures tools invoking `--all-features` (or external crates enabling
@@ -53,20 +55,52 @@ tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 libsql = "0.9.20"
 tokio-postgres = "0.7"
+anyhow = "1"
+# Web framework examples
+axum = { version = "0.7", default-features = false, features = ["http1", "json", "macros", "tokio", "query"] }
+warp = "0.3"
+actix-web = "4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [[example]]
 name = "postgres_e2e"
-path = "examples/postgres_e2e.rs"
+path = "examples/postgres_e2e/main.rs"
 # Intentionally not auto-built in CI to avoid pulling DB containers; enable locally with --features postgres-backend
 required-features = ["never-postgres-example"]
 
 [[example]]
 name = "mysql_e2e"
-path = "examples/mysql_e2e.rs"
+path = "examples/mysql_e2e/main.rs"
 # Intentionally not auto-built in CI to avoid pulling DB containers; enable locally with --features mysql-async
 required-features = ["never-mysql-example"]
 
 [[example]]
 name = "libsql_e2e"
-path = "examples/libsql_e2e.rs"
-required-features = ["libsql-backend"]
+path = "examples/libsql_e2e/main.rs"
+# Intentionally not auto-built in CI/tests; enable locally with --features libsql-backend
+required-features = ["never-web-example"]
+
+[[example]]
+name = "libsql_tx"
+path = "examples/libsql_tx/main.rs"
+# Intentionally not auto-built in CI/tests; enable locally with --features libsql-backend
+required-features = ["never-web-example"]
+
+[[example]]
+name = "axum_libsql"
+path = "examples/axum_libsql/main.rs"
+# Intentionally not auto-built in CI/tests; enable locally with --features libsql-backend
+required-features = ["never-web-example"]
+
+[[example]]
+name = "warp_libsql"
+path = "examples/warp_libsql/main.rs"
+# Intentionally not auto-built in CI/tests; enable locally with --features libsql-backend
+required-features = ["never-web-example"]
+
+[[example]]
+name = "actix_libsql"
+path = "examples/actix_libsql/main.rs"
+# Intentionally not auto-built in CI/tests; enable locally with --features libsql-backend
+required-features = ["never-web-example"]

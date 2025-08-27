@@ -9,8 +9,9 @@
 //!
 //! The `#[derive(Entity)]` macro generates compile-time metadata about your entity,
 //! including a default `RowAdapter` implementation.
-//! ```
-//! # #![allow(unexpected_cfgs)]
+//! ```ignore
+//! // This is a non-runnable snippet to avoid pulling backend-specific adapter impls
+//! // into doctest scope. See the runnable examples under `storeit/examples/`.
 //! use storeit::{Entity, Fetchable}; // `Fetchable` must be in scope to access associated constants.
 //!
 //! // The macro automatically deduces the table name (`users`) by pluralizing

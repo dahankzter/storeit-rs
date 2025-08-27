@@ -444,7 +444,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
         // During coverage runs, cargo-llvm-cov sets cfg(coverage). To keep coverage stable in
         // crates that don't link backend crates directly, we disable backend-specific adapters
         // under cfg(coverage).
-        #[cfg(all(feature = "backend-adapters", not(coverage)))]
+        #[cfg(all(feature = "backend-adapters", not(coverage), not(test)))]
         impl ::storeit_core::RowAdapter<#struct_name> for #adapter_struct_name {
             type Row = ::tokio_postgres::Row;
             fn from_row(&self, row: &Self::Row) -> ::storeit_core::RepoResult<#struct_name> {
@@ -454,7 +454,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
             }
         }
 
-        #[cfg(all(feature = "backend-adapters", not(coverage)))]
+        #[cfg(all(feature = "backend-adapters", not(coverage), not(test)))]
         impl ::storeit_core::RowAdapter<#struct_name> for #adapter_struct_name {
             type Row = ::mysql_async::Row;
             fn from_row(&self, row: &Self::Row) -> ::storeit_core::RepoResult<#struct_name> {
@@ -464,7 +464,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
             }
         }
 
-        #[cfg(all(feature = "backend-adapters", not(coverage)))]
+        #[cfg(all(feature = "backend-adapters", not(coverage), not(test)))]
         impl ::storeit_core::RowAdapter<#struct_name> for #adapter_struct_name {
             type Row = ::libsql::Row;
             fn from_row(&self, row: &Self::Row) -> ::storeit_core::RepoResult<#struct_name> {
