@@ -16,6 +16,10 @@ on:
         description: "Comma-separated list of crates to publish (optional; defaults to all workspace crates)"
         required: false
         type: string
+      level:
+        description: "Version bump level for cargo-release (patch | minor | major). Default: patch"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -51,9 +55,22 @@ jobs:
 
       - name: Dry-run release (no token)
         if: ${{ env.CARGO_REGISTRY_TOKEN == '' }}
+        env:
+          LEVEL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.level != '' && github.event.inputs.level || 'patch' }}
         run: |
-          echo "No crates.io token found; running cargo-release dry-run for verification only."
-          cargo release minor --workspace --no-confirm --dry-run --no-publish
+          # Determine release version from tag when this workflow runs on a tag push.
+          RELEASE_VERSION=""
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+            if [[ "$TAG_NAME" =~ ^v(.+)$ ]]; then
+              RELEASE_VERSION="${BASH_REMATCH[1]}"
+            elif [[ "$TAG_NAME" =~ -v(.+)$ ]]; then
+              RELEASE_VERSION="${BASH_REMATCH[1]}"
+            fi
+          fi
+          CARGO_RELEASE_ARG="${RELEASE_VERSION:-${LEVEL}}"
+          echo "No crates.io token found; running cargo-release dry-run for verification only (arg=${CARGO_RELEASE_ARG})."
+          cargo release "${CARGO_RELEASE_ARG}" --workspace --no-confirm --dry-run --no-publish
 
       - name: "Publish crates to crates.io (skip if version already published)"
         if: ${{ env.CARGO_REGISTRY_TOKEN != '' }}
@@ -61,6 +78,7 @@ jobs:
             CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
             GIT_COMMITTER_NAME: github-actions[bot]
             GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+            LEVEL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.level != '' && github.event.inputs.level || 'patch' }}
         run: |
             # Determine candidate package list: use input `packages` if provided; otherwise default to all workspace crates.
             CANDIDATES=()
@@ -115,16 +133,28 @@ jobs:
             # We avoid remote VCS mutations (--no-tag/--no-push). Commits (if any) won’t be pushed.
             set -euo pipefail
 
+            # Determine release version from tag if present
+            RELEASE_VERSION=""
+            if [ "${{ github.event_name }}" = "push" ]; then
+              TAG_NAME="${GITHUB_REF_NAME}"
+              if [[ "$TAG_NAME" =~ ^v(.+)$ ]]; then
+                RELEASE_VERSION="${BASH_REMATCH[1]}"
+              elif [[ "$TAG_NAME" =~ -v(.+)$ ]]; then
+                RELEASE_VERSION="${BASH_REMATCH[1]}"
+              fi
+            fi
+            CARGO_RELEASE_ARG="${RELEASE_VERSION:-${LEVEL}}"
+            echo "Using cargo-release argument: ${CARGO_RELEASE_ARG}"
             # Run cargo-release per crate so we can gracefully handle already-published versions
             # Write logs outside the repo to avoid creating untracked files that make the workspace dirty.
             LOG_DIR="${RUNNER_TEMP:-/tmp}/cargo-release-logs"
             mkdir -p "$LOG_DIR"
             for crate in "${FILTERED[@]}"; do
-              echo "Publishing $crate..."
+              echo "Bumping and publishing $crate..."
               LOG_FILE="$LOG_DIR/publish_${crate}.log"
               # Run and capture output; allow command to fail so we can inspect
               set +e
-              cargo release --no-confirm --execute \
+              cargo release "${CARGO_RELEASE_ARG}" --no-confirm --execute \
                 --allow-branch HEAD \
                 --no-verify \
                 --no-tag \
