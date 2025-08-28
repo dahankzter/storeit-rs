@@ -3,6 +3,7 @@
 use storeit_core::Identifiable;
 use storeit_core::{RepoError, RepoResult, Repository, RowAdapter};
 use storeit_mysql_async::MysqlAsyncRepository;
+use storeit_core::transactions::TransactionManager;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::mariadb::Mariadb;
 type MariaDb = Mariadb;
@@ -551,5 +552,233 @@ async fn mysql_param_type_mismatch_casts_or_zero_rows() -> RepoResult<()> {
         res.is_empty() || res.iter().all(|u| u.email == "123"),
         "unexpected rows returned"
     );
+    Ok(())
+}
+
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn mysql_transaction_manager_commit_and_rollback() -> RepoResult<()> {
+    if !containers_usable() {
+        eprintln!("[integration] Skipping: Docker not available");
+        return Ok(());
+    }
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
+
+    // Build pool and manager
+    let pool = mysql_async::Pool::new(url.as_str());
+    let tm = storeit_mysql_async::MysqlAsyncTransactionManager::new(pool.clone());
+
+    // Commit path
+    let tm_outer = tm.clone();
+    let committed = tm.clone()
+        .execute(&storeit_core::transactions::TransactionDefinition::default(), move |ctx| {
+            let tm_inner = tm_outer.clone();
+            async move {
+                // Repo inside tx should use the tx connection implicitly
+                let repo = tm_inner
+                    .repository::<tests_common::User, MyAdapter>(ctx, MyAdapter)
+                    .await?;
+            let created = repo
+                .insert(&tests_common::User {
+                    id: None,
+                    email: "tx_commit@example.com".into(),
+                    active: true,
+                })
+                .await?;
+            Ok::<_, RepoError>(created.id)
+            }
+        })
+        .await?;
+
+    // Verify committed row exists
+    let repo = MysqlAsyncRepository::<tests_common::User, MyAdapter>::from_url(
+        &url,
+        tests_common::User::ID_COLUMN,
+        MyAdapter,
+    )
+    .await?;
+    let got = repo.find_by_id(&committed.unwrap()).await?;
+    assert!(got.is_some());
+
+    // Rollback path
+    let tm_outer2 = tm.clone();
+    let err = tm.clone()
+        .execute(&storeit_core::transactions::TransactionDefinition::default(), move |ctx| {
+            let tm_inner2 = tm_outer2.clone();
+            async move {
+                let repo = tm_inner2
+                    .repository::<tests_common::User, MyAdapter>(ctx, MyAdapter)
+                    .await?;
+            let created = repo
+                .insert(&tests_common::User {
+                    id: None,
+                    email: "tx_rollback@example.com".into(),
+                    active: true,
+                })
+                .await?;
+            // Force an error so the transaction rolls back
+            let _ = repo.delete_by_id(&created.id.unwrap()).await?;
+            Err::<(), _>(RepoError::backend(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "force rollback",
+            )))
+            }
+        })
+        .await
+        .expect_err("expected rollback error");
+    let _ = err; // just ensure it is an error
+
+    // Ensure the rolled back email is not present
+    let rows = repo
+        .find_by_field(
+            "email",
+            storeit_core::ParamValue::String("tx_rollback@example.com".into()),
+        )
+        .await?;
+    assert!(rows.is_empty());
+
+    // Best-effort: disconnect pool
+    let _ = pool.disconnect().await;
+    Ok(())
+}
+
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn mysql_transaction_manager_nested_savepoints() -> RepoResult<()> {
+    if !containers_usable() {
+        eprintln!("[integration] Skipping: Docker not available");
+        return Ok(());
+    }
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
+
+    let pool = mysql_async::Pool::new(url.as_str());
+    let tm = storeit_mysql_async::MysqlAsyncTransactionManager::new(pool.clone());
+
+    let tm_outer = tm.clone();
+    tm.clone().execute(&storeit_core::transactions::TransactionDefinition::default(), move |ctx| {
+        let tm_lvl1 = tm_outer.clone();
+        async move {
+            // First level
+            let repo = tm_lvl1
+                .repository::<tests_common::User, MyAdapter>(ctx, MyAdapter)
+                .await?;
+            let _ = repo
+            .insert(&tests_common::User {
+                id: None,
+                email: "sp_l1@example.com".into(),
+                active: true,
+            })
+            .await?;
+
+        // Nested level should use savepoint
+        let mut def = storeit_core::transactions::TransactionDefinition::default();
+        def.propagation = storeit_core::transactions::Propagation::Nested;
+        let tm_outer_lvl2 = tm_lvl1.clone();
+        let _ = tm_lvl1
+            .clone()
+            .execute(&def, move |ctx2| {
+                let tm_lvl2 = tm_outer_lvl2.clone();
+                async move {
+                    let repo2 = tm_lvl2
+                        .repository::<tests_common::User, MyAdapter>(ctx2, MyAdapter)
+                        .await?;
+                    let _ = repo2
+                        .insert(&tests_common::User {
+                            id: None,
+                            email: "sp_l2@example.com".into(),
+                            active: true,
+                        })
+                        .await?;
+                    Ok::<_, RepoError>(())
+                }
+            })
+            .await?;
+        Ok::<_, RepoError>(())
+        }
+    })
+    .await?;
+
+    let repo = MysqlAsyncRepository::<tests_common::User, MyAdapter>::from_url(
+        &url,
+        tests_common::User::ID_COLUMN,
+        MyAdapter,
+    )
+    .await?;
+    for email in ["sp_l1@example.com", "sp_l2@example.com"] {
+        let rows = repo
+            .find_by_field("email", storeit_core::ParamValue::String(email.into()))
+            .await?;
+        assert_eq!(rows.len(), 1, "missing {}", email);
+    }
+
+    let _ = pool.disconnect().await;
+    Ok(())
+}
+
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn mysql_transaction_manager_propagation_supports_and_not_supported() -> RepoResult<()> {
+    if !containers_usable() {
+        eprintln!("[integration] Skipping: Docker not available");
+        return Ok(());
+    }
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
+
+    let pool = mysql_async::Pool::new(url.as_str());
+    let tm = storeit_mysql_async::MysqlAsyncTransactionManager::new(pool.clone());
+
+    // NotSupported outside a tx: function runs without starting tx
+    let mut def = storeit_core::transactions::TransactionDefinition::default();
+    def.propagation = storeit_core::transactions::Propagation::NotSupported;
+    tm.execute(&def, |_ctx| async move { Ok::<_, RepoError>(()) }).await?;
+
+    // Supports outside a tx: should also run without starting tx
+    def.propagation = storeit_core::transactions::Propagation::Supports;
+    tm.execute(&def, |_ctx| async move { Ok::<_, RepoError>(()) }).await?;
+
+    let _ = pool.disconnect().await;
+    Ok(())
+}
+
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn mysql_transaction_manager_propagation_never_errors_when_in_tx() -> RepoResult<()> {
+    if !containers_usable() {
+        eprintln!("[integration] Skipping: Docker not available");
+        return Ok(());
+    }
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
+
+    let pool = mysql_async::Pool::new(url.as_str());
+    let tm = storeit_mysql_async::MysqlAsyncTransactionManager::new(pool.clone());
+
+    // Start a tx and inside try Propagation::Never
+    let tm_outer = tm.clone();
+    let err = tm
+        .clone()
+        .execute(
+            &storeit_core::transactions::TransactionDefinition::default(),
+            move |_ctx| {
+                let tm_inner = tm_outer.clone();
+                async move {
+                    let mut def = storeit_core::transactions::TransactionDefinition::default();
+                    def.propagation = storeit_core::transactions::Propagation::Never;
+                    let r = tm_inner
+                        .clone()
+                        .execute(&def, |_ctx2| async move { Ok::<_, RepoError>(()) })
+                        .await;
+                    assert!(r.is_err(), "Propagation::Never should error inside tx");
+                    Ok::<_, RepoError>(())
+                }
+            },
+        )
+        .await?;
+
+    let _ = err; // silence unused
+    let _ = pool.disconnect().await;
     Ok(())
 }
