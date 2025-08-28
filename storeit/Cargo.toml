@@ -29,6 +29,11 @@ libsql-backend = ["dep:storeit_libsql", "storeit_libsql/libsql-backend", "dep:li
 postgres-backend = ["dep:storeit_tokio_postgres", "storeit_tokio_postgres/postgres-backend", "dep:tokio-postgres"]
 mysql-async = ["dep:storeit_mysql_async", "storeit_mysql_async/mysql-async", "dep:mysql_async"]
 
+# Dummy features used to gate examples so they don't build by default but do not trigger warnings
+never-web-example = []
+never-postgres-example = []
+never-mysql-example = []
+
 # Explicit feature aliases matching optional dependency names.
 # This ensures tools invoking `--all-features` (or external crates enabling
 # features by the dependency name) work even though we use `dep:` syntax above,

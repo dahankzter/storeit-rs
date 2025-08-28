@@ -839,6 +839,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(unreachable_code)]
     fn test_derive_paramvalue_for_portable_types() {
         use chrono::{NaiveDate, NaiveDateTime};
         use rust_decimal::Decimal;

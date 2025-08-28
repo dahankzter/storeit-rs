@@ -526,7 +526,7 @@ async fn postgres_read_only_tx_prevents_writes() -> RepoResult<()> {
                     })
                     .await
                     .expect_err("write should fail in read-only tx");
-                let _ = err; // ensure surfaced
+                drop(err); // ensure surfaced
                 Ok::<_, RepoError>(())
             }
         })

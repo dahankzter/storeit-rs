@@ -63,7 +63,7 @@ fmt:
 format: fmt
 
 clippy:
-	$(CARGO) clippy --workspace --all-targets --all-features -D warnings
+	$(CARGO) clippy --workspace --all-features -- -D warnings
 
 build:
 	$(CARGO) build --workspace --all-features
@@ -79,10 +79,10 @@ clean:
 
 # Coverage using workspace Cargo aliases defined in Cargo.toml
 coverage-html: tools
-	$(CARGO) coverage-html
+	$(CARGO) llvm-cov --workspace --all-features --html
 
 coverage-lcov: tools
-	$(CARGO) coverage-lcov
+	$(CARGO) llvm-cov --workspace --all-features --lcov --output-path lcov.info
 
 coverage: coverage-html
 	@if [ -f "$(COV_HTML_INDEX)" ]; then \

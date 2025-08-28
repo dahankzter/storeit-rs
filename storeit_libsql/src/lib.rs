@@ -798,7 +798,7 @@ mod tests {
                         })
                         .await
                         .expect_err("write should fail in read-only tx");
-                    let _ = err; // just ensure error surfaced
+                    drop(err); // just ensure error surfaced
                     Ok::<_, storeit_core::RepoError>(())
                 }
             })
@@ -997,7 +997,7 @@ mod tests {
             })
             .await
             .expect_err("should rollback");
-        let _ = err; // silence unused
+        drop(err); // silence unused
         let repo2: LibsqlRepository<U, A> = LibsqlRepository::new(db, A);
         let found = repo2
             .find_by_field("email", storeit_core::ParamValue::String("c@x".into()))
@@ -1165,7 +1165,7 @@ mod tests {
             })
             .await
             .expect_err("writes should be blocked in read-only");
-        let _ = err;
+        drop(err);
     }
 
     #[tokio::test]

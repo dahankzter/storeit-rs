@@ -470,21 +470,19 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
                     let msg = format!("Unsupported Option field type '{}' in auto RowAdapter; provide an explicit adapter", f.ty_str);
                     quote! { #ident: return Err(::storeit::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, #msg))) }
                 }
+            } else if f.ty_str == "String" {
+                quote! { #ident: #get_string }
+            } else if f.ty_str == "i32" {
+                quote! { #ident: #get_i32 }
+            } else if f.ty_str == "i64" {
+                quote! { #ident: #get_i64 }
+            } else if f.ty_str == "f64" {
+                quote! { #ident: #get_f64 }
+            } else if f.ty_str == "bool" {
+                quote! { #ident: #get_bool }
             } else {
-                if f.ty_str == "String" {
-                    quote! { #ident: #get_string }
-                } else if f.ty_str == "i32" {
-                    quote! { #ident: #get_i32 }
-                } else if f.ty_str == "i64" {
-                    quote! { #ident: #get_i64 }
-                } else if f.ty_str == "f64" {
-                    quote! { #ident: #get_f64 }
-                } else if f.ty_str == "bool" {
-                    quote! { #ident: #get_bool }
-                } else {
-                    let msg = format!("Unsupported field type '{}' in auto RowAdapter; please provide an explicit adapter", f.ty_str);
-                    quote! { #ident: return Err(::storeit::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, #msg))) }
-                }
+                let msg = format!("Unsupported field type '{}' in auto RowAdapter; please provide an explicit adapter", f.ty_str);
+                quote! { #ident: return Err(::storeit::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, #msg))) }
             }
         })
         .collect();

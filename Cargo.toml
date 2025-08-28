@@ -11,9 +11,4 @@ members = [
 ]
 resolver = "2"
 
-[alias]
-# Coverage aliases used by the Makefile and documented in README
-coverage = "llvm-cov --workspace --all-features"
-coverage-html = "llvm-cov --workspace --all-features --html"
-coverage-lcov = "llvm-cov --workspace --all-features --lcov --output-path lcov.info"
 

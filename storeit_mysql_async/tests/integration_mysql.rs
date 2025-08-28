@@ -635,7 +635,7 @@ async fn mysql_transaction_manager_commit_and_rollback() -> RepoResult<()> {
         )
         .await
         .expect_err("expected rollback error");
-    let _ = err; // just ensure it is an error
+    drop(err); // just ensure it is an error
 
     // Ensure the rolled back email is not present
     let rows = repo
@@ -792,7 +792,7 @@ async fn mysql_transaction_manager_propagation_never_errors_when_in_tx() -> Repo
         )
         .await?;
 
-    let _ = err; // silence unused
+    drop(err); // silence unused
     let _ = pool.disconnect().await;
     Ok(())
 }
