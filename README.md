@@ -584,6 +584,15 @@ See docs/architecture.md for the current architecture and backend overview.
 
 
 
+## Releases & versioning
+
+This workspace uses cargo-release with a shared version across all publishable crates (see release.toml: shared-version = true). We move the whole workspace from X.Y.Z to the next version together.
+
+- Default/tag-driven release: we push a tag (e.g., v0.1.5) and CI publishes. The version bump happens during the CI publish job and is not pushed back (we run cargo-release with --no-push in CI). That means crates.io shows the new version while main stays on the previous version unless we later do a prepare-bump PR.
+- If you want a visible bump commit: run a prepare bump on a branch (cargo release <level> --no-publish --execute --no-tag --no-push), open a PR, merge it, then tag to publish.
+
+See docs/RELEASING.md for details, alternatives, and commands.
+
 ## Crate layout and merging
 
 We intentionally split the workspace into multiple crates (core, macros, builder, per‑backend adapters, and a facade) to keep dependencies optional, compile times reasonable, and versioning flexible. 

@@ -1,8 +1,12 @@
 # cargo-release configuration for the workspace
 # Docs: https://github.com/crate-ci/cargo-release
 
-# We keep per-crate versions; no shared-version bump by default
-shared-version = false
+# Use a single version across the workspace so we can bump once
+shared-version = true
+
+# Upgrade internal dependency requirements automatically on release.
+# This ensures minor/major bumps update inter-crate "version = \"^X.Y\"" bounds.
+dependent-version = "upgrade"
 
 # Only allow releases from the main branch
 allow-branch = ["main", "HEAD"]
