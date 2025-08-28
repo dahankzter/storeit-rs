@@ -45,8 +45,8 @@
 
 // Re-export all core traits and helper macros so generated code can reference `::storeit::...` paths.
 pub use storeit_core::{
-    async_trait, Fetchable, Identifiable, Insertable, ParamValue, RepoError, RepoResult, Repository,
-    RowAdapter, Updatable,
+    async_trait, Fetchable, Identifiable, Insertable, ParamValue, RepoError, RepoResult,
+    Repository, RowAdapter, Updatable,
 };
 
 // Re-export all procedural macros.
