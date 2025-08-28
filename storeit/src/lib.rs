@@ -246,6 +246,23 @@ pub mod row {
         fn get_opt_string(&self, idx: usize) -> Result<Option<String>, RepoError>;
     }
 
+    // Backend row type aliases; always present for name resolution in generated code.
+    // When the backend feature is disabled, these are empty marker types (no RowRead impls).
+    #[cfg(feature = "postgres-backend")]
+    pub type PgRow = tokio_postgres::Row;
+    #[cfg(not(feature = "postgres-backend"))]
+    pub enum PgRow {}
+
+    #[cfg(feature = "mysql-async")]
+    pub type MyRow = mysql_async::Row;
+    #[cfg(not(feature = "mysql-async"))]
+    pub enum MyRow {}
+
+    #[cfg(feature = "libsql-backend")]
+    pub type LibRow = libsql::Row;
+    #[cfg(not(feature = "libsql-backend"))]
+    pub enum LibRow {}
+
     #[cfg(feature = "postgres-backend")]
     impl RowRead for tokio_postgres::Row {
         fn get_i64(&self, idx: usize) -> Result<i64, RepoError> {
@@ -293,31 +310,61 @@ pub mod row {
     #[cfg(feature = "mysql-async")]
     impl RowRead for mysql_async::Row {
         fn get_i64(&self, idx: usize) -> Result<i64, RepoError> {
-            self.get(idx)
-                .ok_or_else(|| RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("missing idx {}", idx))))
+            self.get(idx).ok_or_else(|| {
+                RepoError::mapping(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("missing idx {}", idx),
+                ))
+            })
         }
         fn get_i32(&self, idx: usize) -> Result<i32, RepoError> {
-            self.get(idx)
-                .ok_or_else(|| RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("missing idx {}", idx))))
+            self.get(idx).ok_or_else(|| {
+                RepoError::mapping(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("missing idx {}", idx),
+                ))
+            })
         }
         fn get_f64(&self, idx: usize) -> Result<f64, RepoError> {
-            self.get(idx)
-                .ok_or_else(|| RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("missing idx {}", idx))))
+            self.get(idx).ok_or_else(|| {
+                RepoError::mapping(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("missing idx {}", idx),
+                ))
+            })
         }
         fn get_bool(&self, idx: usize) -> Result<bool, RepoError> {
             // mysql stores bool as integer; Row::get can convert
-            self.get(idx)
-                .ok_or_else(|| RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("missing idx {}", idx))))
+            self.get(idx).ok_or_else(|| {
+                RepoError::mapping(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("missing idx {}", idx),
+                ))
+            })
         }
         fn get_string(&self, idx: usize) -> Result<String, RepoError> {
-            self.get(idx)
-                .ok_or_else(|| RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("missing idx {}", idx))))
+            self.get(idx).ok_or_else(|| {
+                RepoError::mapping(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("missing idx {}", idx),
+                ))
+            })
         }
-        fn get_opt_i64(&self, idx: usize) -> Result<Option<i64>, RepoError> { Ok(self.get(idx)) }
-        fn get_opt_i32(&self, idx: usize) -> Result<Option<i32>, RepoError> { Ok(self.get(idx)) }
-        fn get_opt_f64(&self, idx: usize) -> Result<Option<f64>, RepoError> { Ok(self.get(idx)) }
-        fn get_opt_bool(&self, idx: usize) -> Result<Option<bool>, RepoError> { Ok(self.get(idx)) }
-        fn get_opt_string(&self, idx: usize) -> Result<Option<String>, RepoError> { Ok(self.get(idx)) }
+        fn get_opt_i64(&self, idx: usize) -> Result<Option<i64>, RepoError> {
+            Ok(self.get(idx))
+        }
+        fn get_opt_i32(&self, idx: usize) -> Result<Option<i32>, RepoError> {
+            Ok(self.get(idx))
+        }
+        fn get_opt_f64(&self, idx: usize) -> Result<Option<f64>, RepoError> {
+            Ok(self.get(idx))
+        }
+        fn get_opt_bool(&self, idx: usize) -> Result<Option<bool>, RepoError> {
+            Ok(self.get(idx))
+        }
+        fn get_opt_string(&self, idx: usize) -> Result<Option<String>, RepoError> {
+            Ok(self.get(idx))
+        }
     }
 
     #[cfg(feature = "libsql-backend")]

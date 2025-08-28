@@ -633,24 +633,28 @@ pub fn repository(attr: TokenStream, item: TokenStream) -> TokenStream {
         _ => panic!("`entity` must be a type path for repository macro"),
     };
 
-    let (backend_repo_ty, backend_row_ty) = match args.backend.to_string().as_str() {
-        "TokioPostgres" => (
-            quote! { ::storeit::backends::TokioPostgresRepository },
-            quote! { ::tokio_postgres::Row },
-        ),
-        "MysqlAsync" => (
-            quote! { ::storeit::backends::MysqlAsyncRepository },
-            quote! { ::mysql_async::Row },
-        ),
-        "Libsql" => (
-            quote! { ::storeit::backends::LibsqlRepository },
-            quote! { ::libsql::Row },
-        ),
-        other => panic!(
+    let (backend_repo_ty, backend_row_ty, backend_row_alias) =
+        match args.backend.to_string().as_str() {
+            "TokioPostgres" => (
+                quote! { ::storeit::backends::TokioPostgresRepository },
+                quote! { ::tokio_postgres::Row },
+                quote! { ::storeit::row::PgRow },
+            ),
+            "MysqlAsync" => (
+                quote! { ::storeit::backends::MysqlAsyncRepository },
+                quote! { ::mysql_async::Row },
+                quote! { ::storeit::row::MyRow },
+            ),
+            "Libsql" => (
+                quote! { ::storeit::backends::LibsqlRepository },
+                quote! { ::libsql::Row },
+                quote! { ::storeit::row::LibRow },
+            ),
+            other => panic!(
             "Unsupported backend: `{}`. Supported backends are: TokioPostgres, MysqlAsync, Libsql",
             other
         ),
-    };
+        };
 
     let mut find_by_methods = Vec::new();
     if let Some(finders) = &args.finders {
@@ -707,6 +711,13 @@ pub fn repository(attr: TokenStream, item: TokenStream) -> TokenStream {
                 pub async fn from_url_with_adapter(conn_str: &str, adapter: A) -> ::storeit::RepoResult<Self> {
                     let inner = #backend_repo_ty::from_url(conn_str, <#entity_ty as ::storeit::Identifiable>::ID_COLUMN, adapter).await?;
                     Ok(Self { inner })
+                }
+
+                /// Convenience constructor that uses the auto-generated RowAdapter for this entity
+                /// and the appropriate backend row type.
+                pub async fn from_url(conn_str: &str) -> ::storeit::RepoResult<Self> {
+                    let adapter = #_adapter_path_ts::<#backend_row_alias>::new();
+                    Self::from_url_with_adapter(conn_str, adapter).await
                 }
 
                 pub fn new(backend_repo: #backend_repo_ty<#entity_ty, A>) -> Self {
