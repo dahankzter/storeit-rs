@@ -97,6 +97,79 @@ fn skip_containers() -> bool {
         .unwrap_or(false)
 }
 
+// Serialize container-heavy integration tests and share a single container across tests.
+static GLOBAL_IT_LOCK: std::sync::OnceLock<tokio::sync::Mutex<()>> = std::sync::OnceLock::new();
+async fn acquire_it_lock() -> tokio::sync::MutexGuard<'static, ()> {
+    GLOBAL_IT_LOCK
+        .get_or_init(|| tokio::sync::Mutex::new(()))
+        .lock()
+        .await
+}
+
+// Single shared Postgres container for the entire file (started lazily on first use)
+static DB_ONCE: tokio::sync::OnceCell<(testcontainers::ContainerAsync<Postgres>, String)> =
+    tokio::sync::OnceCell::const_new();
+async fn shared_db_url() -> String {
+    let (_node, url) = DB_ONCE
+        .get_or_init(|| async {
+            let node = Postgres::default().start().await;
+            let port = node.get_host_port_ipv4(5432).await;
+            let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
+            // Ensure schema once globally
+            apply_migration_with_retry(&url)
+                .await
+                .expect("apply migration");
+            (node, url)
+        })
+        .await;
+    url.clone()
+}
+
+async fn apply_migration(url: &str) -> RepoResult<()> {
+    // Connect and ensure server is ready
+    let client = pg_connect_with_retry(url).await?;
+    client
+        .batch_execute("SELECT 1;")
+        .await
+        .map_err(RepoError::backend)?;
+    // Apply schema
+    client
+        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
+        .await
+        .map_err(RepoError::backend)?;
+    Ok(())
+}
+
+async fn apply_migration_with_retry(url: &str) -> RepoResult<()> {
+    let max_attempts = 180usize;
+    for attempt in 1..=max_attempts {
+        eprintln!(
+            "[integration][postgres] migration attempt {}/{} using url: {}",
+            attempt, max_attempts, url
+        );
+        match tokio::time::timeout(std::time::Duration::from_secs(5), apply_migration(url)).await {
+            Ok(Ok(())) => return Ok(()),
+            Ok(Err(e)) => {
+                eprintln!(
+                    "[integration][postgres] migration attempt {}/{} failed: {:#}",
+                    attempt, max_attempts, e
+                );
+            }
+            Err(_) => {
+                eprintln!(
+                    "[integration][postgres] migration attempt {}/{} timed out",
+                    attempt, max_attempts
+                );
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+    Err(RepoError::backend(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "migration failed after retries",
+    )))
+}
+
 #[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_crud_and_find_by_field() -> RepoResult<()> {
@@ -105,16 +178,8 @@ async fn postgres_crud_and_find_by_field() -> RepoResult<()> {
         return Ok(());
     }
 
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-
-    // Apply schema using plain SQL to avoid environment-specific Refinery issues under coverage
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
 
     let factory = PgFactory { url: url.clone() };
     tests_common::test_crud_roundtrip(&factory).await?;
@@ -143,14 +208,8 @@ async fn postgres_unique_violation_on_duplicate_email() -> RepoResult<()> {
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
 
     let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
         &url,
@@ -184,14 +243,8 @@ async fn postgres_find_by_field_bool_and_null() -> RepoResult<()> {
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
     let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
         &url,
         tests_common::User::ID_COLUMN,
@@ -242,14 +295,8 @@ async fn postgres_bad_column_name_errors() -> RepoResult<()> {
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
     let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
         &url,
         tests_common::User::ID_COLUMN,
@@ -295,14 +342,8 @@ async fn postgres_row_adapter_mapping_error_surfaces() -> RepoResult<()> {
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
 
     // Seed one user
     let good_repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
@@ -346,14 +387,8 @@ async fn postgres_param_type_mismatch_errors() -> RepoResult<()> {
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
     let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
         &url,
         tests_common::User::ID_COLUMN,
@@ -395,15 +430,8 @@ async fn postgres_transaction_commit_persists_using_manager() -> RepoResult<()> 
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
 
     use storeit_core::transactions::{
         Isolation, Propagation, TransactionDefinition, TransactionManager,
@@ -464,15 +492,8 @@ async fn postgres_read_only_tx_prevents_writes() -> RepoResult<()> {
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
 
     use storeit_core::transactions::{
         Isolation, Propagation, TransactionDefinition, TransactionManager,
@@ -540,15 +561,8 @@ async fn postgres_nested_savepoints_commit_and_rollback() -> RepoResult<()> {
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
 
     use storeit_core::transactions::{
         Isolation, Propagation, TransactionDefinition, TransactionManager,
@@ -674,15 +688,8 @@ async fn postgres_transaction_repository_reuse_commits() -> RepoResult<()> {
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
 
     // Prebuild a repository OUTSIDE any transaction and reuse it inside.
     let repo_outside = TokioPostgresRepository::<tests_common::User, A>::from_url(
@@ -752,14 +759,8 @@ async fn postgres_find_by_id_not_found_returns_none() -> RepoResult<()> {
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
 
     let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
         &url,
@@ -780,14 +781,8 @@ async fn postgres_update_persists_and_only_target_row_changes() -> RepoResult<()
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
 
     let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
         &url,
@@ -845,14 +840,8 @@ async fn postgres_delete_idempotent() -> RepoResult<()> {
         eprintln!("[integration] Skipping: Docker not available");
         return Ok(());
     }
-    let node = Postgres::default().start().await;
-    let port = node.get_host_port_ipv4(5432).await;
-    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-    let client = pg_connect_with_retry(&url).await?;
-    client
-        .batch_execute(tests_common::migrations::POSTGRES_USERS_SQL)
-        .await
-        .map_err(RepoError::backend)?;
+    let _lock = acquire_it_lock().await;
+    let url = shared_db_url().await;
 
     let repo = TokioPostgresRepository::<tests_common::User, A>::from_url(
         &url,

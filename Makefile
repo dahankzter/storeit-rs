@@ -21,13 +21,14 @@ ifdef RUN_CONTAINERS
 SKIP_CONTAINER_TESTS := 0
 endif
 
-.PHONY: help tools fmt clippy build test doc clean coverage coverage-html coverage-lcov coverage-enforce coverage-summary coverage-merge integration-backends
+.PHONY: help tools fmt format clippy build test doc clean coverage coverage-html coverage-lcov coverage-enforce coverage-summary coverage-merge integration-backends
 
 help:
 	@echo "Available targets:"
 	@echo "  help               - Show this help"
 	@echo "  tools              - Install coverage prerequisites (cargo-llvm-cov, llvm-tools-preview)"
 	@echo "  fmt                - Run rustfmt on all crates"
+	@echo "  format             - Alias for 'fmt' (runs rustfmt on all crates)"
 	@echo "  clippy             - Run clippy on all targets with all features (deny warnings)"
 	@echo "  build              - Build the entire workspace with all features"
 	@echo "  test               - Run tests for the entire workspace with all features"
@@ -58,6 +59,8 @@ tools:
 
 fmt:
 	$(CARGO) fmt --all
+
+format: fmt
 
 clippy:
 	$(CARGO) clippy --workspace --all-targets --all-features -D warnings

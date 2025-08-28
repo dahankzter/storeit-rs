@@ -1,9 +1,9 @@
 #![cfg(feature = "mysql-async")]
 
+use storeit_core::transactions::TransactionManager;
 use storeit_core::Identifiable;
 use storeit_core::{RepoError, RepoResult, Repository, RowAdapter};
 use storeit_mysql_async::MysqlAsyncRepository;
-use storeit_core::transactions::TransactionManager;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::mariadb::Mariadb;
 type MariaDb = Mariadb;
@@ -571,24 +571,28 @@ async fn mysql_transaction_manager_commit_and_rollback() -> RepoResult<()> {
 
     // Commit path
     let tm_outer = tm.clone();
-    let committed = tm.clone()
-        .execute(&storeit_core::transactions::TransactionDefinition::default(), move |ctx| {
-            let tm_inner = tm_outer.clone();
-            async move {
-                // Repo inside tx should use the tx connection implicitly
-                let repo = tm_inner
-                    .repository::<tests_common::User, MyAdapter>(ctx, MyAdapter)
-                    .await?;
-            let created = repo
-                .insert(&tests_common::User {
-                    id: None,
-                    email: "tx_commit@example.com".into(),
-                    active: true,
-                })
-                .await?;
-            Ok::<_, RepoError>(created.id)
-            }
-        })
+    let committed = tm
+        .clone()
+        .execute(
+            &storeit_core::transactions::TransactionDefinition::default(),
+            move |ctx| {
+                let tm_inner = tm_outer.clone();
+                async move {
+                    // Repo inside tx should use the tx connection implicitly
+                    let repo = tm_inner
+                        .repository::<tests_common::User, MyAdapter>(ctx, MyAdapter)
+                        .await?;
+                    let created = repo
+                        .insert(&tests_common::User {
+                            id: None,
+                            email: "tx_commit@example.com".into(),
+                            active: true,
+                        })
+                        .await?;
+                    Ok::<_, RepoError>(created.id)
+                }
+            },
+        )
         .await?;
 
     // Verify committed row exists
@@ -603,28 +607,32 @@ async fn mysql_transaction_manager_commit_and_rollback() -> RepoResult<()> {
 
     // Rollback path
     let tm_outer2 = tm.clone();
-    let err = tm.clone()
-        .execute(&storeit_core::transactions::TransactionDefinition::default(), move |ctx| {
-            let tm_inner2 = tm_outer2.clone();
-            async move {
-                let repo = tm_inner2
-                    .repository::<tests_common::User, MyAdapter>(ctx, MyAdapter)
-                    .await?;
-            let created = repo
-                .insert(&tests_common::User {
-                    id: None,
-                    email: "tx_rollback@example.com".into(),
-                    active: true,
-                })
-                .await?;
-            // Force an error so the transaction rolls back
-            let _ = repo.delete_by_id(&created.id.unwrap()).await?;
-            Err::<(), _>(RepoError::backend(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "force rollback",
-            )))
-            }
-        })
+    let err = tm
+        .clone()
+        .execute(
+            &storeit_core::transactions::TransactionDefinition::default(),
+            move |ctx| {
+                let tm_inner2 = tm_outer2.clone();
+                async move {
+                    let repo = tm_inner2
+                        .repository::<tests_common::User, MyAdapter>(ctx, MyAdapter)
+                        .await?;
+                    let created = repo
+                        .insert(&tests_common::User {
+                            id: None,
+                            email: "tx_rollback@example.com".into(),
+                            active: true,
+                        })
+                        .await?;
+                    // Force an error so the transaction rolls back
+                    let _ = repo.delete_by_id(&created.id.unwrap()).await?;
+                    Err::<(), _>(RepoError::backend(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "force rollback",
+                    )))
+                }
+            },
+        )
         .await
         .expect_err("expected rollback error");
     let _ = err; // just ensure it is an error
@@ -657,48 +665,52 @@ async fn mysql_transaction_manager_nested_savepoints() -> RepoResult<()> {
     let tm = storeit_mysql_async::MysqlAsyncTransactionManager::new(pool.clone());
 
     let tm_outer = tm.clone();
-    tm.clone().execute(&storeit_core::transactions::TransactionDefinition::default(), move |ctx| {
-        let tm_lvl1 = tm_outer.clone();
-        async move {
-            // First level
-            let repo = tm_lvl1
-                .repository::<tests_common::User, MyAdapter>(ctx, MyAdapter)
-                .await?;
-            let _ = repo
-            .insert(&tests_common::User {
-                id: None,
-                email: "sp_l1@example.com".into(),
-                active: true,
-            })
-            .await?;
-
-        // Nested level should use savepoint
-        let mut def = storeit_core::transactions::TransactionDefinition::default();
-        def.propagation = storeit_core::transactions::Propagation::Nested;
-        let tm_outer_lvl2 = tm_lvl1.clone();
-        let _ = tm_lvl1
-            .clone()
-            .execute(&def, move |ctx2| {
-                let tm_lvl2 = tm_outer_lvl2.clone();
+    tm.clone()
+        .execute(
+            &storeit_core::transactions::TransactionDefinition::default(),
+            move |ctx| {
+                let tm_lvl1 = tm_outer.clone();
                 async move {
-                    let repo2 = tm_lvl2
-                        .repository::<tests_common::User, MyAdapter>(ctx2, MyAdapter)
+                    // First level
+                    let repo = tm_lvl1
+                        .repository::<tests_common::User, MyAdapter>(ctx, MyAdapter)
                         .await?;
-                    let _ = repo2
+                    let _ = repo
                         .insert(&tests_common::User {
                             id: None,
-                            email: "sp_l2@example.com".into(),
+                            email: "sp_l1@example.com".into(),
                             active: true,
+                        })
+                        .await?;
+
+                    // Nested level should use savepoint
+                    let mut def = storeit_core::transactions::TransactionDefinition::default();
+                    def.propagation = storeit_core::transactions::Propagation::Nested;
+                    let tm_outer_lvl2 = tm_lvl1.clone();
+                    let _ = tm_lvl1
+                        .clone()
+                        .execute(&def, move |ctx2| {
+                            let tm_lvl2 = tm_outer_lvl2.clone();
+                            async move {
+                                let repo2 = tm_lvl2
+                                    .repository::<tests_common::User, MyAdapter>(ctx2, MyAdapter)
+                                    .await?;
+                                let _ = repo2
+                                    .insert(&tests_common::User {
+                                        id: None,
+                                        email: "sp_l2@example.com".into(),
+                                        active: true,
+                                    })
+                                    .await?;
+                                Ok::<_, RepoError>(())
+                            }
                         })
                         .await?;
                     Ok::<_, RepoError>(())
                 }
-            })
-            .await?;
-        Ok::<_, RepoError>(())
-        }
-    })
-    .await?;
+            },
+        )
+        .await?;
 
     let repo = MysqlAsyncRepository::<tests_common::User, MyAdapter>::from_url(
         &url,
@@ -733,11 +745,13 @@ async fn mysql_transaction_manager_propagation_supports_and_not_supported() -> R
     // NotSupported outside a tx: function runs without starting tx
     let mut def = storeit_core::transactions::TransactionDefinition::default();
     def.propagation = storeit_core::transactions::Propagation::NotSupported;
-    tm.execute(&def, |_ctx| async move { Ok::<_, RepoError>(()) }).await?;
+    tm.execute(&def, |_ctx| async move { Ok::<_, RepoError>(()) })
+        .await?;
 
     // Supports outside a tx: should also run without starting tx
     def.propagation = storeit_core::transactions::Propagation::Supports;
-    tm.execute(&def, |_ctx| async move { Ok::<_, RepoError>(()) }).await?;
+    tm.execute(&def, |_ctx| async move { Ok::<_, RepoError>(()) })
+        .await?;
 
     let _ = pool.disconnect().await;
     Ok(())

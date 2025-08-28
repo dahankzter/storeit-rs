@@ -15,3 +15,6 @@ storeit = { package = "storeit", path = "../storeit" }
 [lib]
 name = "tests_common"
 path = "src/lib.rs"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
