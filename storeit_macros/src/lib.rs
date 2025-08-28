@@ -354,7 +354,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
     // --- Generate `RowAdapter` ---
     let adapter_struct_name = Ident::new(&format!("{}RowAdapter", struct_name), struct_name.span());
 
-    let try_get_mappings: Vec<_> = fields_metadata
+    let _try_get_mappings: Vec<_> = fields_metadata
         .iter()
         .map(|f| {
             if f.is_skipped {
@@ -381,7 +381,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    let mysql_get_mappings: Vec<_> = fields_metadata
+    let _mysql_get_mappings: Vec<_> = fields_metadata
         .iter()
         .map(|f| {
             if f.is_skipped {
@@ -406,7 +406,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    let libsql_get_mappings: Vec<_> = fields_metadata
+    let _libsql_get_mappings: Vec<_> = fields_metadata
         .iter()
         .enumerate()
         .map(|(i, f)| {
@@ -437,40 +437,73 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
         })
         .collect();
 
+    // Build per-field initializers using index-based getters on ::storeit::row::RowRead
+    let field_inits: Vec<proc_macro2::TokenStream> = fields_metadata
+        .iter()
+        .enumerate()
+        .map(|(i, f)| {
+            let ident = &f.ident;
+            let idx_lit = proc_macro2::Literal::usize_unsuffixed(i);
+            let get_string = quote! { row.get_string(#idx_lit)? };
+            let get_i32 = quote! { row.get_i32(#idx_lit)? };
+            let get_i64 = quote! { row.get_i64(#idx_lit)? };
+            let get_f64 = quote! { row.get_f64(#idx_lit)? };
+            let get_bool = quote! { row.get_bool(#idx_lit)? };
+
+            if is_option(&f.ty) {
+                if f.ty_str.contains("String") {
+                    let get = quote! { row.get_opt_string(#idx_lit)? };
+                    quote! { #ident: #get }
+                } else if f.ty_str.contains("i32") {
+                    let get = quote! { row.get_opt_i32(#idx_lit)? };
+                    quote! { #ident: #get }
+                } else if f.ty_str.contains("i64") {
+                    let get = quote! { row.get_opt_i64(#idx_lit)? };
+                    quote! { #ident: #get }
+                } else if f.ty_str.contains("f64") {
+                    let get = quote! { row.get_opt_f64(#idx_lit)? };
+                    quote! { #ident: #get }
+                } else if f.ty_str.contains("bool") {
+                    let get = quote! { row.get_opt_bool(#idx_lit)? };
+                    quote! { #ident: #get }
+                } else {
+                    let msg = format!("Unsupported Option field type '{}' in auto RowAdapter; provide an explicit adapter", f.ty_str);
+                    quote! { #ident: return Err(::storeit::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, #msg))) }
+                }
+            } else {
+                if f.ty_str == "String" {
+                    quote! { #ident: #get_string }
+                } else if f.ty_str == "i32" {
+                    quote! { #ident: #get_i32 }
+                } else if f.ty_str == "i64" {
+                    quote! { #ident: #get_i64 }
+                } else if f.ty_str == "f64" {
+                    quote! { #ident: #get_f64 }
+                } else if f.ty_str == "bool" {
+                    quote! { #ident: #get_bool }
+                } else {
+                    let msg = format!("Unsupported field type '{}' in auto RowAdapter; please provide an explicit adapter", f.ty_str);
+                    quote! { #ident: return Err(::storeit::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, #msg))) }
+                }
+            }
+        })
+        .collect();
+
     let row_adapter_impls = quote! {
         #[derive(Debug, Clone, Copy, Default)]
-        pub struct #adapter_struct_name;
+        pub struct #adapter_struct_name<R>(::core::marker::PhantomData<R>);
 
-        // During coverage runs, cargo-llvm-cov sets cfg(coverage). To keep coverage stable in
-        // crates that don't link backend crates directly, we disable backend-specific adapters
-        // under cfg(coverage).
-        #[cfg(all(feature = "backend-adapters", not(coverage), not(test)))]
-        impl ::storeit::RowAdapter<#struct_name> for #adapter_struct_name {
-            type Row = ::tokio_postgres::Row;
-            fn from_row(&self, row: &Self::Row) -> ::storeit::RepoResult<#struct_name> {
-                Ok(#struct_name {
-                    #(#try_get_mappings),*
-                })
-            }
+        impl<R> #adapter_struct_name<R> {
+            pub fn new() -> Self { Self(::core::marker::PhantomData) }
         }
 
-        #[cfg(all(feature = "backend-adapters", not(coverage), not(test)))]
-        impl ::storeit::RowAdapter<#struct_name> for #adapter_struct_name {
-            type Row = ::mysql_async::Row;
+        impl<R> ::storeit::RowAdapter<#struct_name> for #adapter_struct_name<R>
+        where
+            R: ::storeit::row::RowRead,
+        {
+            type Row = R;
             fn from_row(&self, row: &Self::Row) -> ::storeit::RepoResult<#struct_name> {
-                Ok(#struct_name {
-                    #(#mysql_get_mappings),*
-                })
-            }
-        }
-
-        #[cfg(all(feature = "backend-adapters", not(coverage), not(test)))]
-        impl ::storeit::RowAdapter<#struct_name> for #adapter_struct_name {
-            type Row = ::libsql::Row;
-            fn from_row(&self, row: &Self::Row) -> ::storeit::RepoResult<#struct_name> {
-                Ok(#struct_name {
-                    #(#libsql_get_mappings),*
-                })
+                Ok(#struct_name { #(#field_inits),* })
             }
         }
     };
@@ -586,7 +619,7 @@ pub fn repository(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Build the path to the generated <Entity>RowAdapter type by replacing the
     // last path segment ident with "<Entity>RowAdapter".
-    let adapter_path_ts: proc_macro2::TokenStream = match entity_ty {
+    let _adapter_path_ts: proc_macro2::TokenStream = match entity_ty {
         syn::Type::Path(tp) => {
             let mut p = tp.path.clone();
             if let Some(last) = p.segments.last_mut() {
@@ -683,19 +716,9 @@ pub fn repository(attr: TokenStream, item: TokenStream) -> TokenStream {
                 #(#find_by_methods)*
             }
 
-            // Convenience constructor when using the default generated RowAdapter for the entity.
-            // Only available when backend-specific adapters are enabled and coverage is off.
-            #[cfg(all(feature = "backend-adapters", not(coverage)))]
-            impl Repository<#adapter_path_ts> {
-                pub async fn from_url(conn_str: &str) -> ::storeit::RepoResult<Self> {
-                    let inner = #backend_repo_ty::from_url(
-                        conn_str,
-                        <#entity_ty as ::storeit::Identifiable>::ID_COLUMN,
-                        #adapter_path_ts,
-                    ).await?;
-                    Ok(Self { inner })
-                }
-            }
+            // Note: We intentionally do not generate a convenience constructor that relies on
+            // an auto-generated RowAdapter here to avoid emitting cfg(feature) conditions into
+            // downstream crates. Use `from_url_with_adapter` and pass an explicit adapter.
 
             #[::storeit::async_trait]
             impl<A> ::storeit::Repository<#entity_ty> for Repository<A>

@@ -14,7 +14,7 @@ fn facade_reexports_and_entity_metadata() {
     assert_eq!(User::TABLE, "users");
     assert_eq!(User::SELECT_COLUMNS, &["id", "email"]);
 
-    // Ensure the macro generated a RowAdapter type with the expected name in the consumer crate.
+    // Ensure the macro generated a generic RowAdapter type with the expected name in the consumer crate.
     // We don't construct rows here; just ensure the type exists and is name-resolved.
-    let _adapter = UserRowAdapter;
+    type _Assert<R> = UserRowAdapter<R>;
 }

@@ -15,9 +15,8 @@ fn facade_reexports_and_entity_metadata() {
     assert_eq!(Mini::TABLE, "minis");
     assert_eq!(Mini::SELECT_COLUMNS, &["id", "email_address"]);
 
-    // Ensure the generated RowAdapter type is in scope via facade usage.
-    let _adapter = MiniRowAdapter;
-    let _ = _adapter;
+    // Ensure the generated generic RowAdapter type is in scope via facade usage.
+    type _Assert<R> = MiniRowAdapter<R>;
 
     // Exercise core types through facade.
     let v = vec![
