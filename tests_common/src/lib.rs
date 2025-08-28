@@ -2,7 +2,7 @@
 //! Common integration testing utilities and generic tests reusable across backends.
 
 use async_trait::async_trait;
-use repository::Entity;
+use storeit::Entity;
 use storeit_core::Repository;
 
 #[derive(Entity, Clone, Debug, PartialEq)]

@@ -8,7 +8,9 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 async-trait = "0.1"
 storeit_core = { package = "storeit_core", path = "../storeit_core" }
-repository = { package = "storeit", path = "../storeit" }
+# Depend on the facade crate both under its canonical name (storeit) for macro expansions
+# and under the alias `repository` used in examples/tests.
+storeit = { package = "storeit", path = "../storeit" }
 
 [lib]
 name = "tests_common"

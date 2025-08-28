@@ -207,7 +207,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
         .collect();
 
     let fetchable_impl = quote! {
-        impl ::storeit_core::Fetchable for #struct_name {
+        impl ::storeit::Fetchable for #struct_name {
             const TABLE: &'static str = #table_name;
             const SELECT_COLUMNS: &'static [&'static str] = &[#(#select_columns),*];
             const FINDABLE_COLUMNS: &'static [(&'static str, &'static str)] = &[#(#findable_columns),*];
@@ -239,7 +239,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
     };
 
     let identifiable_impl = quote! {
-        impl ::storeit_core::Identifiable for #struct_name {
+        impl ::storeit::Identifiable for #struct_name {
             type Key = #key_ty;
             const ID_COLUMN: &'static str = #id_column_name;
             fn id(&self) -> Option<Self::Key> {
@@ -256,63 +256,63 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
         if is_option(&field.ty) {
             return match ty_str.as_str() {
                 s if s.contains("String") => {
-                    quote! { self.#ident.as_ref().cloned().map(::storeit_core::ParamValue::String).unwrap_or(::storeit_core::ParamValue::Null) }
+                    quote! { self.#ident.as_ref().cloned().map(::storeit::ParamValue::String).unwrap_or(::storeit::ParamValue::Null) }
                 }
                 s if s.contains("i32") => {
-                    quote! { self.#ident.map_or(::storeit_core::ParamValue::Null, ::storeit_core::ParamValue::I32) }
+                    quote! { self.#ident.map_or(::storeit::ParamValue::Null, ::storeit::ParamValue::I32) }
                 }
                 s if s.contains("i64") => {
-                    quote! { self.#ident.map_or(::storeit_core::ParamValue::Null, ::storeit_core::ParamValue::I64) }
+                    quote! { self.#ident.map_or(::storeit::ParamValue::Null, ::storeit::ParamValue::I64) }
                 }
                 s if s.contains("f64") => {
-                    quote! { self.#ident.map_or(::storeit_core::ParamValue::Null, ::storeit_core::ParamValue::F64) }
+                    quote! { self.#ident.map_or(::storeit::ParamValue::Null, ::storeit::ParamValue::F64) }
                 }
                 s if s.contains("bool") => {
-                    quote! { self.#ident.map_or(::storeit_core::ParamValue::Null, ::storeit_core::ParamValue::Bool) }
+                    quote! { self.#ident.map_or(::storeit::ParamValue::Null, ::storeit::ParamValue::Bool) }
                 }
                 s if s.contains("SystemTime") => {
-                    quote! { self.#ident.map_or(::storeit_core::ParamValue::Null, |st| ::storeit_core::ParamValue::I64(::chrono::DateTime::<::chrono::Utc>::from(st).timestamp_millis())) }
+                    quote! { self.#ident.map_or(::storeit::ParamValue::Null, |st| ::storeit::ParamValue::I64(::chrono::DateTime::<::chrono::Utc>::from(st).timestamp_millis())) }
                 }
                 s if s.contains("NaiveDateTime") => {
-                    quote! { self.#ident.as_ref().map(|v| ::storeit_core::ParamValue::String(v.to_string())).unwrap_or(::storeit_core::ParamValue::Null) }
+                    quote! { self.#ident.as_ref().map(|v| ::storeit::ParamValue::String(v.to_string())).unwrap_or(::storeit::ParamValue::Null) }
                 }
                 s if s.contains("NaiveDate") => {
-                    quote! { self.#ident.as_ref().map(|v| ::storeit_core::ParamValue::String(v.to_string())).unwrap_or(::storeit_core::ParamValue::Null) }
+                    quote! { self.#ident.as_ref().map(|v| ::storeit::ParamValue::String(v.to_string())).unwrap_or(::storeit::ParamValue::Null) }
                 }
                 s if s.contains("rust_decimal::Decimal") || s.ends_with("::Decimal") || s == "Decimal" || s.contains("Decimal") => {
-                    quote! { self.#ident.as_ref().map(|v| ::storeit_core::ParamValue::String(v.to_string())).unwrap_or(::storeit_core::ParamValue::Null) }
+                    quote! { self.#ident.as_ref().map(|v| ::storeit::ParamValue::String(v.to_string())).unwrap_or(::storeit::ParamValue::Null) }
                 }
                 s if s.contains("uuid::Uuid") || s.ends_with("::Uuid") || s == "Uuid" || s.contains("Uuid") => {
-                    quote! { self.#ident.as_ref().map(|v| ::storeit_core::ParamValue::String(v.to_string())).unwrap_or(::storeit_core::ParamValue::Null) }
+                    quote! { self.#ident.as_ref().map(|v| ::storeit::ParamValue::String(v.to_string())).unwrap_or(::storeit::ParamValue::Null) }
                 }
                 _ => panic!("Unsupported Option type for ParamValue: {}. Hint: map this field to a supported type (String/i32/i64/f64/bool), or mark it with #[fetch(skip)] to exclude it from persistence.", ty_str),
             };
         }
 
         match ty_str.as_str() {
-            "String" => quote! { ::storeit_core::ParamValue::String(self.#ident.clone()) },
-            "i32" => quote! { ::storeit_core::ParamValue::I32(self.#ident) },
-            "i64" => quote! { ::storeit_core::ParamValue::I64(self.#ident) },
-            "f64" => quote! { ::storeit_core::ParamValue::F64(self.#ident) },
-            "bool" => quote! { ::storeit_core::ParamValue::Bool(self.#ident) },
+            "String" => quote! { ::storeit::ParamValue::String(self.#ident.clone()) },
+            "i32" => quote! { ::storeit::ParamValue::I32(self.#ident) },
+            "i64" => quote! { ::storeit::ParamValue::I64(self.#ident) },
+            "f64" => quote! { ::storeit::ParamValue::F64(self.#ident) },
+            "bool" => quote! { ::storeit::ParamValue::Bool(self.#ident) },
             s if s.ends_with("SystemTime") => {
-                quote! { ::storeit_core::ParamValue::I64(::chrono::DateTime::<::chrono::Utc>::from(self.#ident).timestamp_millis()) }
+                quote! { ::storeit::ParamValue::I64(::chrono::DateTime::<::chrono::Utc>::from(self.#ident).timestamp_millis()) }
             }
             s if s.ends_with("NaiveDateTime") => {
                 // Use Display to format to a portable string (e.g., "YYYY-MM-DD HH:MM:SS").
-                quote! { ::storeit_core::ParamValue::String(self.#ident.to_string()) }
+                quote! { ::storeit::ParamValue::String(self.#ident.to_string()) }
             }
             s if s.ends_with("NaiveDate") => {
                 // Format as YYYY-MM-DD.
-                quote! { ::storeit_core::ParamValue::String(self.#ident.to_string()) }
+                quote! { ::storeit::ParamValue::String(self.#ident.to_string()) }
             }
             s if s.ends_with("rust_decimal::Decimal") || s.ends_with("Decimal") => {
                 // Decimal string representation.
-                quote! { ::storeit_core::ParamValue::String(self.#ident.to_string()) }
+                quote! { ::storeit::ParamValue::String(self.#ident.to_string()) }
             }
             s if s.ends_with("uuid::Uuid") || s.ends_with("Uuid") => {
                 // Standard hyphenated UUID string.
-                quote! { ::storeit_core::ParamValue::String(self.#ident.to_string()) }
+                quote! { ::storeit::ParamValue::String(self.#ident.to_string()) }
             }
             _ => panic!("Unsupported type for ParamValue: {}. Hint: map this field to a supported type (String/i32/i64/f64/bool) or mark it with #[fetch(skip)]. See docs/plan.md item 15 for portable types.", ty_str),
         }
@@ -326,9 +326,9 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
     let insert_values: Vec<_> = insert_fields.iter().map(|f| to_param_value(f)).collect();
 
     let insertable_impl = quote! {
-        impl ::storeit_core::Insertable for #struct_name {
+        impl ::storeit::Insertable for #struct_name {
             const INSERT_COLUMNS: &'static [&'static str] = &[#(#insert_columns),*];
-            fn insert_values(&self) -> Vec<::storeit_core::ParamValue> {
+            fn insert_values(&self) -> Vec<::storeit::ParamValue> {
                 vec![#(#insert_values),*]
             }
         }
@@ -343,9 +343,9 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
     update_values.push(to_param_value(id_field));
 
     let updatable_impl = quote! {
-        impl ::storeit_core::Updatable for #struct_name {
+        impl ::storeit::Updatable for #struct_name {
             const UPDATE_COLUMNS: &'static [&'static str] = &[#(#update_columns),*];
-            fn update_values(&self) -> Vec<::storeit_core::ParamValue> {
+            fn update_values(&self) -> Vec<::storeit::ParamValue> {
                 vec![#(#update_values),*]
             }
         }
@@ -369,14 +369,14 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
                     #ident: {
                         let val: ::chrono::DateTime<::chrono::Utc> = row
                             .try_get(#col_name_lit)
-                            .map_err(|e| ::storeit_core::RepoError::mapping(e))?;
+                            .map_err(|e| ::storeit::RepoError::mapping(e))?;
                         val.into()
                     }
                 }
             } else {
                 quote! { #ident: row
                 .try_get(#col_name_lit)
-                .map_err(|e| ::storeit_core::RepoError::mapping(e))? }
+                .map_err(|e| ::storeit::RepoError::mapping(e))? }
             }
         })
         .collect();
@@ -396,12 +396,12 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
                 quote! {
                     #ident: {
                         let naive_dt: ::chrono::NaiveDateTime = row.get(#col_name_lit)
-                            .ok_or_else(|| ::storeit_core::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("missing required column {}.{} in row", #table_name, #col_name_lit))))?;
+                            .ok_or_else(|| ::storeit::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("missing required column {}.{} in row", #table_name, #col_name_lit))))?;
                         ::chrono::DateTime::<::chrono::Utc>::from_naive_utc_and_offset(naive_dt, ::chrono::Utc).into()
                     }
                 }
             } else {
-                quote! { #ident: row.get(#col_name_lit).ok_or_else(|| ::storeit_core::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("missing required column {}.{} in row", #table_name, #col_name_lit))))? }
+                quote! { #ident: row.get(#col_name_lit).ok_or_else(|| ::storeit::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("missing required column {}.{} in row", #table_name, #col_name_lit))))? }
             }
         })
         .collect();
@@ -423,16 +423,16 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
                         // Assumes the DB stores a unix timestamp (i64) and we convert it.
                         let ts_seconds: i64 = row
                             .get(#col_index)
-                            .map_err(|e| ::storeit_core::RepoError::mapping(e))?;
+                            .map_err(|e| ::storeit::RepoError::mapping(e))?;
                         ::chrono::DateTime::from_timestamp(ts_seconds, 0)
                             .map(std::convert::Into::into)
-                            .ok_or_else(|| ::storeit_core::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("Invalid timestamp in {}[{}]", #table_name, #col_index))))?
+                            .ok_or_else(|| ::storeit::RepoError::mapping(std::io::Error::new(std::io::ErrorKind::Other, format!("Invalid timestamp in {}[{}]", #table_name, #col_index))))?
                     }
                 }
             } else {
                 quote! { #ident: row
                     .get(#col_index)
-                    .map_err(|e| ::storeit_core::RepoError::mapping(e))? }
+                    .map_err(|e| ::storeit::RepoError::mapping(e))? }
             }
         })
         .collect();
@@ -445,9 +445,9 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
         // crates that don't link backend crates directly, we disable backend-specific adapters
         // under cfg(coverage).
         #[cfg(all(feature = "backend-adapters", not(coverage), not(test)))]
-        impl ::storeit_core::RowAdapter<#struct_name> for #adapter_struct_name {
+        impl ::storeit::RowAdapter<#struct_name> for #adapter_struct_name {
             type Row = ::tokio_postgres::Row;
-            fn from_row(&self, row: &Self::Row) -> ::storeit_core::RepoResult<#struct_name> {
+            fn from_row(&self, row: &Self::Row) -> ::storeit::RepoResult<#struct_name> {
                 Ok(#struct_name {
                     #(#try_get_mappings),*
                 })
@@ -455,9 +455,9 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
         }
 
         #[cfg(all(feature = "backend-adapters", not(coverage), not(test)))]
-        impl ::storeit_core::RowAdapter<#struct_name> for #adapter_struct_name {
+        impl ::storeit::RowAdapter<#struct_name> for #adapter_struct_name {
             type Row = ::mysql_async::Row;
-            fn from_row(&self, row: &Self::Row) -> ::storeit_core::RepoResult<#struct_name> {
+            fn from_row(&self, row: &Self::Row) -> ::storeit::RepoResult<#struct_name> {
                 Ok(#struct_name {
                     #(#mysql_get_mappings),*
                 })
@@ -465,9 +465,9 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
         }
 
         #[cfg(all(feature = "backend-adapters", not(coverage), not(test)))]
-        impl ::storeit_core::RowAdapter<#struct_name> for #adapter_struct_name {
+        impl ::storeit::RowAdapter<#struct_name> for #adapter_struct_name {
             type Row = ::libsql::Row;
-            fn from_row(&self, row: &Self::Row) -> ::storeit_core::RepoResult<#struct_name> {
+            fn from_row(&self, row: &Self::Row) -> ::storeit::RepoResult<#struct_name> {
                 Ok(#struct_name {
                     #(#libsql_get_mappings),*
                 })
@@ -630,11 +630,11 @@ pub fn repository(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             let ty_string = ty.to_token_stream().to_string();
             let param_conversion = match ty_string.as_str() {
-                "String" => quote! { ::storeit_core::ParamValue::String(value.clone()) },
-                "i32" => quote! { ::storeit_core::ParamValue::I32(*value) },
-                "i64" => quote! { ::storeit_core::ParamValue::I64(*value) },
-                "f64" => quote! { ::storeit_core::ParamValue::F64(*value) },
-                "bool" => quote! { ::storeit_core::ParamValue::Bool(*value) },
+                "String" => quote! { ::storeit::ParamValue::String(value.clone()) },
+                "i32" => quote! { ::storeit::ParamValue::I32(*value) },
+                "i64" => quote! { ::storeit::ParamValue::I64(*value) },
+                "f64" => quote! { ::storeit::ParamValue::F64(*value) },
+                "bool" => quote! { ::storeit::ParamValue::Bool(*value) },
                 _ => {
                     let err_msg = format!(
                         "Unsupported finder type: {}. Use String, i32, i64, f64, or bool.",
@@ -645,7 +645,7 @@ pub fn repository(attr: TokenStream, item: TokenStream) -> TokenStream {
             };
 
             find_by_methods.push(quote! {
-                pub async fn #method_name(&self, value: &#ty) -> ::storeit_core::RepoResult<Vec<#entity_ty>> {
+                pub async fn #method_name(&self, value: &#ty) -> ::storeit::RepoResult<Vec<#entity_ty>> {
                     let param = #param_conversion;
                     self.inner.find_by_field(#field_name_lit, param).await
                 }
@@ -656,7 +656,7 @@ pub fn repository(attr: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         pub mod #mod_name {
             use super::*;
-            use ::storeit_core::{RowAdapter, Repository as _};
+            use ::storeit::{RowAdapter, Repository as _};
 
             pub struct Repository<A>
             where
@@ -668,11 +668,11 @@ pub fn repository(attr: TokenStream, item: TokenStream) -> TokenStream {
             impl<A> Repository<A>
             where
                 A: RowAdapter<#entity_ty, Row = #backend_row_ty> + Send + Sync + 'static,
-                #backend_repo_ty<#entity_ty, A>: ::storeit_core::Repository<#entity_ty>,
+                #backend_repo_ty<#entity_ty, A>: ::storeit::Repository<#entity_ty>,
             {
                 /// Construct using an explicit adapter instance.
-                pub async fn from_url_with_adapter(conn_str: &str, adapter: A) -> ::storeit_core::RepoResult<Self> {
-                    let inner = #backend_repo_ty::from_url(conn_str, <#entity_ty as ::storeit_core::Identifiable>::ID_COLUMN, adapter).await?;
+                pub async fn from_url_with_adapter(conn_str: &str, adapter: A) -> ::storeit::RepoResult<Self> {
+                    let inner = #backend_repo_ty::from_url(conn_str, <#entity_ty as ::storeit::Identifiable>::ID_COLUMN, adapter).await?;
                     Ok(Self { inner })
                 }
 
@@ -687,39 +687,39 @@ pub fn repository(attr: TokenStream, item: TokenStream) -> TokenStream {
             // Only available when backend-specific adapters are enabled and coverage is off.
             #[cfg(all(feature = "backend-adapters", not(coverage)))]
             impl Repository<#adapter_path_ts> {
-                pub async fn from_url(conn_str: &str) -> ::storeit_core::RepoResult<Self> {
+                pub async fn from_url(conn_str: &str) -> ::storeit::RepoResult<Self> {
                     let inner = #backend_repo_ty::from_url(
                         conn_str,
-                        <#entity_ty as ::storeit_core::Identifiable>::ID_COLUMN,
+                        <#entity_ty as ::storeit::Identifiable>::ID_COLUMN,
                         #adapter_path_ts,
                     ).await?;
                     Ok(Self { inner })
                 }
             }
 
-            #[::storeit_core::async_trait]
-            impl<A> ::storeit_core::Repository<#entity_ty> for Repository<A>
+            #[::storeit::async_trait]
+            impl<A> ::storeit::Repository<#entity_ty> for Repository<A>
             where
                 A: RowAdapter<#entity_ty, Row = #backend_row_ty> + Send + Sync + 'static,
-                #backend_repo_ty<#entity_ty, A>: ::storeit_core::Repository<#entity_ty>,
+                #backend_repo_ty<#entity_ty, A>: ::storeit::Repository<#entity_ty>,
             {
-                async fn find_by_id(&self, id: &<#entity_ty as ::storeit_core::Identifiable>::Key) -> ::storeit_core::RepoResult<Option<#entity_ty>> {
+                async fn find_by_id(&self, id: &<#entity_ty as ::storeit::Identifiable>::Key) -> ::storeit::RepoResult<Option<#entity_ty>> {
                     self.inner.find_by_id(id).await
                 }
 
-                async fn find_by_field(&self, field_name: &str, value: ::storeit_core::ParamValue) -> ::storeit_core::RepoResult<Vec<#entity_ty>> {
+                async fn find_by_field(&self, field_name: &str, value: ::storeit::ParamValue) -> ::storeit::RepoResult<Vec<#entity_ty>> {
                     self.inner.find_by_field(field_name, value).await
                 }
 
-                async fn insert(&self, entity: &#entity_ty) -> ::storeit_core::RepoResult<#entity_ty> {
+                async fn insert(&self, entity: &#entity_ty) -> ::storeit::RepoResult<#entity_ty> {
                     self.inner.insert(entity).await
                 }
 
-                async fn update(&self, entity: &#entity_ty) -> ::storeit_core::RepoResult<#entity_ty> {
+                async fn update(&self, entity: &#entity_ty) -> ::storeit::RepoResult<#entity_ty> {
                     self.inner.update(entity).await
                 }
 
-                async fn delete_by_id(&self, id: &<#entity_ty as ::storeit_core::Identifiable>::Key) -> ::storeit_core::RepoResult<bool> {
+                async fn delete_by_id(&self, id: &<#entity_ty as ::storeit::Identifiable>::Key) -> ::storeit::RepoResult<bool> {
                     self.inner.delete_by_id(id).await
                 }
             }

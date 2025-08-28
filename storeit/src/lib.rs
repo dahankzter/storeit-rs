@@ -43,10 +43,10 @@
 
 #![allow(unexpected_cfgs)] // Temporarily allow unknown `cfg(feature = "dep:*")` values until backend crates are published
 
-// Re-export all core traits.
+// Re-export all core traits and helper macros so generated code can reference `::storeit::...` paths.
 pub use storeit_core::{
-    Fetchable, Identifiable, Insertable, ParamValue, RepoError, RepoResult, Repository, RowAdapter,
-    Updatable,
+    async_trait, Fetchable, Identifiable, Insertable, ParamValue, RepoError, RepoResult, Repository,
+    RowAdapter, Updatable,
 };
 
 // Re-export all procedural macros.

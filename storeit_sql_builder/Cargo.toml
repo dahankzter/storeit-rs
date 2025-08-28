@@ -24,6 +24,8 @@ unstable = []
 
 [dev-dependencies]
 storeit_macros = { package = "storeit_macros", path = "../storeit_macros", version = "0.1" }
+# The Entity derive expands to ::storeit::... paths; provide the facade for tests.
+storeit = { package = "storeit", path = "../storeit", version = "0.1" }
 # Keep tests backend-agnostic: do not enable backend-specific macro features here,
 # and avoid pulling backend crates. This prevents generating unused RowAdapter impls
 # in tests that would otherwise appear as uncovered in coverage reports.
